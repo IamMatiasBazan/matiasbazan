@@ -1,0 +1,8 @@
+{
+  "name": "portafolio-mati-bazan-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd matias-macos && npm install && npm run build && mkdir -p ../os && cp -r out/* ../os/"
+  }
+}

@@ -1,14 +1,14 @@
 {
-    "cleanUrls": true,
-    "trailingSlash": false,
-    "rewrites": [
-        {
-            "source": "/os",
-            "destination": "/os/index.html"
-        },
-        {
-            "source": "/os/(.*)",
-            "destination": "/os/$1"
-        }
-    ]
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/os",
+      "destination": "/os/index.html"
+    },
+    {
+      "source": "/os/:path*",
+      "destination": "/os/:path*"
+    }
+  ]
 }
