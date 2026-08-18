@@ -867,7 +867,7 @@ y las experiencias interactivas cinematograficas.`);
       {/* Fondo de pantalla Neo_Indigo.jpg */}
       <div
         className="absolute inset-0 w-full h-full z-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('Neo_Indigo.jpg')" }}
+        style={{ backgroundImage: "url('/os/Neo_Indigo.jpg')" }}
       />
 
       {/* Zona de detección hover superior para la barra de menú cuando una app está maximizada */}
@@ -1276,7 +1276,7 @@ y las experiencias interactivas cinematograficas.`);
                     <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-2 mb-1">iCloud</div>
                     <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 font-medium">
                       <span className="flex items-center gap-2">
-                        <img src="notas-apple.png" className="w-4 h-4 object-contain" alt="" />
+                        <img src="/os/notas-apple.png" className="w-4 h-4 object-contain" alt="" />
                         <span>Notas</span>
                       </span>
                       <span className="text-[11px] text-yellow-400/80">{notesList.length}</span>
@@ -1383,7 +1383,7 @@ y las experiencias interactivas cinematograficas.`);
                                       }}
                                       className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-semibold rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 cursor-pointer"
                                     >
-                                      <img src="MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>Sitio Web</span>
                                     </button>
                                     <a
@@ -1392,7 +1392,7 @@ y las experiencias interactivas cinematograficas.`);
                                       rel="noreferrer"
                                       className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold rounded-lg border border-white/15 transition flex items-center gap-1.5 cursor-pointer no-underline"
                                     >
-                                      <img src="DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>GitHub</span>
                                     </a>
                                   </div>
@@ -1447,7 +1447,7 @@ y las experiencias interactivas cinematograficas.`);
                                       }}
                                       className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-semibold rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 cursor-pointer"
                                     >
-                                      <img src="MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>Sitio Web</span>
                                     </button>
                                     <a
@@ -1456,7 +1456,7 @@ y las experiencias interactivas cinematograficas.`);
                                       rel="noreferrer"
                                       className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold rounded-lg border border-white/15 transition flex items-center gap-1.5 cursor-pointer no-underline"
                                     >
-                                      <img src="DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>GitHub</span>
                                     </a>
                                   </div>
@@ -1510,7 +1510,7 @@ y las experiencias interactivas cinematograficas.`);
                                       }}
                                       className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-semibold rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 cursor-pointer"
                                     >
-                                      <img src="MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>Sitio Web</span>
                                     </button>
                                     <a
@@ -1519,7 +1519,7 @@ y las experiencias interactivas cinematograficas.`);
                                       rel="noreferrer"
                                       className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold rounded-lg border border-white/15 transition flex items-center gap-1.5 cursor-pointer no-underline"
                                     >
-                                      <img src="DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>GitHub</span>
                                     </a>
                                   </div>
@@ -1565,7 +1565,7 @@ y las experiencias interactivas cinematograficas.`);
                                       }}
                                       className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-semibold rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 cursor-pointer"
                                     >
-                                      <img src="MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/MdiWeb.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>Sitio Web</span>
                                     </button>
                                     <a
@@ -1574,7 +1574,7 @@ y las experiencias interactivas cinematograficas.`);
                                       rel="noreferrer"
                                       className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold rounded-lg border border-white/15 transition flex items-center gap-1.5 cursor-pointer no-underline"
                                     >
-                                      <img src="DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                                      <img src="/os/DeviconGithub.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                                       <span>GitHub</span>
                                     </a>
                                   </div>
@@ -2025,7 +2025,7 @@ y las experiencias interactivas cinematograficas.`);
                     }}
                     className="flex items-center gap-1.5 hover:bg-black/5 px-2 py-0.5 rounded cursor-pointer transition shrink-0"
                   >
-                    <img src="premium.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                    <img src="/os/premium.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                     <span>Premium</span>
                   </div>
 
@@ -2038,7 +2038,7 @@ y las experiencias interactivas cinematograficas.`);
                     }}
                     className="flex items-center gap-1.5 hover:bg-black/5 px-2 py-0.5 rounded cursor-pointer transition shrink-0"
                   >
-                    <img src="logo-desktop.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                    <img src="/os/logo-desktop.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                     <span>Tecnológico</span>
                   </div>
 
@@ -2051,7 +2051,7 @@ y las experiencias interactivas cinematograficas.`);
                     }}
                     className="flex items-center gap-1.5 hover:bg-black/5 px-2 py-0.5 rounded cursor-pointer transition shrink-0"
                   >
-                    <img src="mariobros.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                    <img src="/os/mariobros.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                     <span>Mario Bros</span>
                   </div>
 
@@ -2064,7 +2064,7 @@ y las experiencias interactivas cinematograficas.`);
                     }}
                     className="flex items-center gap-1.5 hover:bg-black/5 px-2 py-0.5 rounded cursor-pointer transition shrink-0"
                   >
-                    <img src="jhonnydepp.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                    <img src="/os/jhonnydepp.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                     <span>Johnny Depp</span>
                   </div>
 
@@ -2077,7 +2077,7 @@ y las experiencias interactivas cinematograficas.`);
                     }}
                     className="flex items-center gap-1.5 hover:bg-black/5 px-2 py-0.5 rounded cursor-pointer transition shrink-0"
                   >
-                    <img src="dumbledore.svg" className="w-3.5 h-3.5 object-contain" alt="" />
+                    <img src="/os/dumbledore.svg" className="w-3.5 h-3.5 object-contain" alt="" />
                     <span>Dumbledore</span>
                   </div>
                 </div>
@@ -2092,7 +2092,7 @@ y las experiencias interactivas cinematograficas.`);
                   <div className="w-full h-full bg-white text-[#222222] flex flex-col items-center justify-center font-sans p-6 select-none">
 
                     {/* Classic Google Logo */}
-                    <img src="LogosGoogle.svg" className="w-[260px] h-auto object-contain mb-6 select-none pointer-events-none" alt="Google" />
+                    <img src="/os/LogosGoogle.svg" className="w-[260px] h-auto object-contain mb-6 select-none pointer-events-none" alt="Google" />
 
                     {/* Search Bar Mock matching design */}
                     <div className="w-full max-w-[560px] h-[48px] bg-white rounded-full border border-gray-200/90 shadow-sm flex items-center justify-between px-5 hover:shadow-md focus-within:shadow-md transition-all mb-8">
@@ -2139,7 +2139,7 @@ y las experiencias interactivas cinematograficas.`);
                           className="flex flex-col items-center gap-2 group cursor-pointer transition w-[64px]"
                         >
                           <div className="w-[44px] h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
-                            <img src="premium.svg" className="w-6 h-6 object-contain" alt="" />
+                            <img src="/os/premium.svg" className="w-6 h-6 object-contain" alt="" />
                           </div>
                           <span className="text-[10px] text-gray-700 font-sans group-hover:text-black leading-tight text-center truncate w-full">Premium</span>
                         </div>
@@ -2154,7 +2154,7 @@ y las experiencias interactivas cinematograficas.`);
                           className="flex flex-col items-center gap-2 group cursor-pointer transition w-[64px]"
                         >
                           <div className="w-[44px] h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
-                            <img src="logo-desktop.svg" className="w-6 h-6 object-contain" alt="" />
+                            <img src="/os/logo-desktop.svg" className="w-6 h-6 object-contain" alt="" />
                           </div>
                           <span className="text-[10px] text-gray-700 font-sans group-hover:text-black leading-tight text-center truncate w-full">Tecnológico</span>
                         </div>
@@ -2313,7 +2313,7 @@ y las experiencias interactivas cinematograficas.`);
             className="flex flex-col items-center gap-0.5 relative group"
           >
             <div className="w-[52px] h-[52px] flex items-center justify-center cursor-pointer shadow-lg rounded-[14px] overflow-hidden">
-              <img src="notas-apple.png" className="w-full h-full object-cover" alt="Notas" />
+              <img src="/os/notas-apple.png" className="w-full h-full object-cover" alt="Notas" />
             </div>
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Notas
@@ -2331,7 +2331,7 @@ y las experiencias interactivas cinematograficas.`);
             className="flex flex-col items-center gap-0.5 relative group"
           >
             <div className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center cursor-pointer shadow-lg overflow-hidden">
-              <img src="terminal.png" className="w-full h-full object-cover" alt="Terminal" />
+              <img src="/os/terminal.png" className="w-full h-full object-cover" alt="Terminal" />
             </div>
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Terminal
