@@ -1173,7 +1173,7 @@ y las experiencias interactivas cinematograficas.`);
               {/* Cuerpo del Finder (Visor PDF original de pantalla completa) */}
               <div className="flex flex-1 overflow-hidden bg-white">
                 <iframe
-                  src="cv/CV-Matias-Bazan.pdf"
+                  src="/os/cv/CV-Matias-Bazan.pdf"
                   className="w-full h-full border-none"
                   style={{ pointerEvents: isDraggingActive ? "none" : "auto" }}
                   title="CV Matias Bazan"
@@ -2162,7 +2162,7 @@ y las experiencias interactivas cinematograficas.`);
                         {/* Currículum */}
                         <div
                           onClick={() => {
-                            const target = "cv/CV-Matias-Bazan.pdf";
+                            const target = "/os/cv/CV-Matias-Bazan.pdf";
                             setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: target, title: "Currículum" } : t));
                             setChromeInputUrl(target);
                           }}
