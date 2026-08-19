@@ -3,6 +3,34 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Folder,
+  FileCode,
+  FileImage,
+  FileArchive,
+  HardDrive,
+  Clock,
+  Users,
+  Monitor,
+  Cloud,
+  Home as HomeIcon,
+  Radio,
+  Trash2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Share2,
+  Tag,
+  MoreHorizontal,
+  LayoutGrid,
+  List,
+  Columns,
+  Image as ImageIcon,
+  SlidersHorizontal,
+  File,
+  FileText,
+  FileDown
+} from "lucide-react";
 
 const LiquidGlass = dynamic(() => import("liquid-glass-react"), { ssr: false });
 const Rnd = dynamic(() => import("react-rnd").then((mod) => mod.Rnd), { ssr: false });
@@ -77,7 +105,8 @@ export default function Home() {
   const [isCharging, setIsCharging] = useState(false);
 
   const [openWindows, setOpenWindows] = useState<WindowsMap>({
-    finder: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 180, y: 70 }, size: { width: 880, height: 580 }, minimizedPosition: { x: 200, y: 200 } },
+    finder: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 180, y: 70 }, size: { width: 900, height: 600 }, minimizedPosition: { x: 200, y: 200 } },
+    acrobat: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 210, y: 90 }, size: { width: 880, height: 580 }, minimizedPosition: { x: 220, y: 220 } },
     notes: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 250, y: 100 }, size: { width: 550, height: 380 }, minimizedPosition: { x: 280, y: 260 } },
     terminal: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 220, y: 110 }, size: { width: 620, height: 400 }, minimizedPosition: { x: 320, y: 300 } },
     chrome: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 180, y: 60 }, size: { width: 850, height: 530 }, minimizedPosition: { x: 90, y: 130 } },
@@ -101,9 +130,120 @@ export default function Home() {
   const isAnyAppMaximized = (Object.keys(openWindows) as string[]).some(
     appId => openWindows[appId].isOpen && openWindows[appId].isMaximized && !openWindows[appId].isMinimized
   );
+  const initialFS: Record<string, Record<string, string | null>> = {
+    "~": { "Documents": null, "Desktop": null },
+    "~/Desktop": {
+      "Google Chrome": "[Acceso Directo] Abre la aplicación Google Chrome desde el Escritorio.",
+      "CV_Matias_Bazan.pdf": "[Documento PDF — Curriculum Vitae de Matias Bazan]"
+    },
+    "~/Documents": { "Proyectos": null, "CV_Matias_Bazan.pdf": "[Documento PDF — Curriculum Vitae de Matias Bazan]" },
+    "~/Documents/Proyectos": {
+      "albus-dumbledore-web": null,
+      "johnny-depp-web": null,
+      "mario-bros-web": null,
+      "portafolio-premium": null,
+      "portafolio-mati-bazan": null,
+      "README.md": "# Proyectos Personales\n\nColeccion de proyectos web de Matias Bazan.\nTodos estan deployados en Vercel."
+    }
+  };
 
-  // Finder Active Section State
-  const [finderSection, setFinderSection] = useState("cv-pdf");
+  const [terminalFS, setTerminalFS] = useState<Record<string, Record<string, string | null>>>(initialFS);
+  const [loadedGithubRepos, setLoadedGithubRepos] = useState<Record<string, boolean>>({});
+  // Finder Explorer states
+  const [finderPath, setFinderPath] = useState("~");
+  const [finderHistory, setFinderHistory] = useState<string[]>(["~"]);
+  const [finderHistoryIndex, setFinderHistoryIndex] = useState(0);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [finderSearch, setFinderSearch] = useState("");
+  const [viewingFileContent, setViewingFileContent] = useState<{ name: string; content: string } | null>(null);
+  const [finderViewMode, setFinderViewMode] = useState<"grid" | "list">("grid");
+
+  const navigateToFinderFolder = (targetPath: string) => {
+    if (finderPath === targetPath) return;
+    const newHistory = finderHistory.slice(0, finderHistoryIndex + 1);
+    newHistory.push(targetPath);
+    setFinderHistory(newHistory);
+    setFinderHistoryIndex(newHistory.length - 1);
+    setFinderPath(targetPath);
+    setSelectedFileName(null);
+    setViewingFileContent(null);
+  };
+
+  const navigateFinderBack = () => {
+    if (finderHistoryIndex > 0) {
+      const prevIdx = finderHistoryIndex - 1;
+      setFinderHistoryIndex(prevIdx);
+      setFinderPath(finderHistory[prevIdx]);
+      setSelectedFileName(null);
+      setViewingFileContent(null);
+    }
+  };
+
+  const navigateFinderForward = () => {
+    if (finderHistoryIndex < finderHistory.length - 1) {
+      const nextIdx = finderHistoryIndex + 1;
+      setFinderHistoryIndex(nextIdx);
+      setFinderPath(finderHistory[nextIdx]);
+      setSelectedFileName(null);
+      setViewingFileContent(null);
+    }
+  };
+
+  // Dynamic GitHub Project file loader
+  useEffect(() => {
+    if (!finderPath.startsWith("~/Documents/Proyectos/")) return;
+
+    const pathParts = finderPath.split("/");
+    const folderName = pathParts[3];
+    if (!folderName) return;
+
+    const repoMapping: Record<string, string> = {
+      "albus-dumbledore-web": "proyecto-dumbledore-web",
+      "johnny-depp-web": "proyecto-johnnydepp-web",
+      "mario-bros-web": "proyecto-mariobros-web",
+      "portafolio-premium": "portafolio-premium",
+      "portafolio-mati-bazan": "portafolio-matias-bazan-web"
+    };
+
+    const repoName = repoMapping[folderName] || folderName;
+    const subPath = pathParts.slice(4).join("/");
+    const cacheKey = `${repoName}/${subPath}`;
+    if (loadedGithubRepos[cacheKey]) return;
+
+    fetch(`https://api.github.com/repos/IamMatiasBazan/${repoName}/contents/${subPath}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Repo or files not found in GitHub");
+        return res.json();
+      })
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return;
+
+        setLoadedGithubRepos(prev => ({ ...prev, [cacheKey]: true }));
+
+        setTerminalFS(prev => {
+          const updated = { ...prev };
+          const currentDir = { ...(updated[finderPath] || {}) };
+
+          data.forEach(item => {
+            if (item.type === "dir") {
+              currentDir[item.name] = null;
+              const fullChildPath = `${finderPath}/${item.name}`;
+              if (!updated[fullChildPath]) {
+                updated[fullChildPath] = {};
+              }
+            } else {
+              currentDir[item.name] = `[Archivo de GitHub - Clic para ver contenido]\n\nURL de descarga: ${item.download_url}`;
+            }
+          });
+
+          updated[finderPath] = currentDir;
+          return updated;
+        });
+      })
+      .catch((err) => {
+        console.warn("GitHub dynamic loader fallback: ", err);
+      });
+  }, [finderPath, loadedGithubRepos]);
 
   // Active note index inside macOS Notes App
   interface NoteItem {
@@ -205,48 +345,11 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
     { type: "output", text: "" }
   ]);
 
-  // Virtual filesystem definition
-  const terminalFS: Record<string, Record<string, string | null>> = {
-    "~": { "Documents": null, "Desktop": null, ".zshrc": "export PATH=$PATH:/usr/local/bin\nalias ll='ls -la'\nalias dev='npm run dev'" },
-    "~/Documents": { "Proyectos": null, "CV_Matias_Bazan.pdf": "[Documento PDF — Curriculum Vitae de Matias Bazan]" },
-    "~/Documents/Proyectos": {
-      "albus-dumbledore-web": null,
-      "johnny-depp-web": null,
-      "mario-bros-web": null,
-      "portafolio-premium": null,
-      "portafolio-mati-bazan": null,
-      "README.md": "# Proyectos Personales\n\nColeccion de proyectos web de Matias Bazan.\nTodos estan deployados en Vercel."
-    },
-    "~/Documents/Proyectos/albus-dumbledore-web": {
-      "index.html": "<!DOCTYPE html><html lang='es'><head><title>Albus Dumbledore</title></head><body>...</body></html>",
-      "style.css": "/* Estilos del universo Harry Potter */\nbody { background: #1a0033; color: #ffd700; }",
-      "script.js": "console.log('Albus Dumbledore Web v1.0');",
-      "README.md": "# Albus Dumbledore Web\n\nProyecto: Sitio web interactivo inspirado en Harry Potter.\nURL: https://proyecto-dumbledore-web.vercel.app/\nStack: HTML5 · CSS3 · JavaScript · Figma"
-    },
-    "~/Documents/Proyectos/johnny-depp-web": {
-      "index.html": "<!DOCTYPE html><html lang='es'><head><title>Deep Style</title></head><body>...</body></html>",
-      "style.css": "body { background: #0d0d0d; color: #e8d5a3; }",
-      "README.md": "# Deep Style\n\nProyecto: Estilo minimalista inspirado en Johnny Depp.\nURL: https://proyecto-johnnydepp-web.vercel.app/\nStack: HTML5 · CSS3 · JavaScript"
-    },
-    "~/Documents/Proyectos/mario-bros-web": {
-      "index.html": "<!DOCTYPE html><html lang='es'><head><title>Super Mario Bros</title></head><body>...</body></html>",
-      "style.css": "body { background: #5c94fc; color: #ffd700; }",
-      "README.md": "# Super Mario Bros Web\n\nProyecto: Experiencia interactiva inspirada en Nintendo.\nURL: https://proyecto-mariobros-web.vercel.app/\nStack: HTML5 · CSS3 · JavaScript"
-    },
-    "~/Documents/Proyectos/portafolio-premium": {
-      "pubspec.yaml": "name: portafolio_premium\nversion: 1.0.0\ndependencies:\n  flutter:\n    sdk: flutter",
-      "lib/main.dart": "import 'package:flutter/material.dart';\nvoid main() => runApp(const PortafolioApp());",
-      "README.md": "# Premium Portafolio\n\nPortafolio interactivo con Flutter Web.\nURL: https://portafolio-matias-bazan.vercel.app/\nStack: Flutter · Dart · Figma · Vercel"
-    },
-    "~/Documents/Proyectos/portafolio-mati-bazan": {
-      "matias-macos": null,
-      "os": null,
-      "README.md": "# Portafolio Mati Bazan - macOS Tahoe\n\nPortafolio interactivo estilo macOS Tahoe.\nStack: Next.js · TypeScript · Tailwind · Framer Motion\nVersion: 2.6.0-stable",
-      "package.json": "{\n  \"name\": \"portafolio-mati-bazan\",\n  \"version\": \"2.6.0\"\n}"
-    }
-  };
+
 
   const terminalBottomRef = useRef<HTMLDivElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const finderGridRef = useRef<HTMLDivElement>(null);
 
   // Audio/Beep on terminal error or actions
   const playBeep = () => {
@@ -351,8 +454,8 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
 
   // Terminal scroll to bottom effect
   useEffect(() => {
-    if (terminalBottomRef.current) {
-      terminalBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
     }
   }, [terminalHistory]);
 
@@ -552,46 +655,26 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
         push("tahoe-mac.local");
         break;
 
-      case "uname":
-        push(args.includes("-a")
-          ? "Darwin tahoe-mac 26.0.0 Darwin Kernel Version 26.0.0 x86_64 Apple M4 Max"
-          : "Darwin");
-        break;
-
       case "echo":
         push(args.join(" ").replace(/^["']|["']$/g, ""));
         break;
 
-      case "env":
-      case "printenv":
-        push(`HOME=/Users/matias
-USER=matias
-SHELL=/bin/zsh
-TERM=xterm-256color
-LANG=es_AR.UTF-8
-PATH=/usr/local/bin:/usr/bin:/bin
-NODE_VERSION=20.15.0
-NPM_VERSION=10.7.0
-FLUTTER_ROOT=/usr/local/flutter`);
-        break;
-
       case "neofetch":
         push(
-`                     .,,uuu,,.          matias@tahoe-mac
-                 .ueMMMMMMMMMMMe.       ─────────────────────────────────
-               uMMMMMMMMMMMMMMMMMMu     OS: macOS Tahoe 26 x86_64
-              uMMMMMMMMMMMMMMMMMMMMu    Host: Portfolio MacBook Pro 16"
-             uMMMMMMMMMMMMMMMMMMMMMM    Kernel: 26.0.0 Darwin
-             MMMMMMMMMMMMMMMMMMMMMMM    Uptime: ${Math.floor(Math.random() * 60 + 5)} mins
-             MMMMMMMMMMMMMMMMMMMMMMM    Shell: zsh 5.9
-             MMMMMMMMMMMMMMMMMMMMMMM    Resolution: Responsive x Liquid Glass
-              MMMMMMMMMMMMMMMMMMMMM     DE: Aqua-Tahoe 2026
-               MMMMMMMMMMMMMMMMM       WM: Quartz Compositor
-                 "YMMMMMMMMMMMM"       Terminal: Tahoe-Console v2.6
-                     """""             CPU: Apple M4 Max (12-core)
-                                        GPU: Apple M4 Max GPU (40-core)
-                                        Memory: 16 GB / 24 GB
-                                        Disk: 128 GB SSD (WebFS)`);
+          `      .uMMMMMu.     .uMMMMMu.           matias@tahoe-mac
+     uMMMMMMMMMu   uMMMMMMMMMu          ─────────────────────────────────
+    uMMMM/   \\MMMuuMMMM/   \\MMMu        OS: macOS Tahoe 26 x86_64
+    MMMM/     \\MMMMMMM/     \\MMM        Host: MacBook Neo
+    MMMM       MMMMMMM       MMMM       Kernel: 26.0.0 Darwin
+    MMMM       MMMMMMM       MMMM       Uptime: ${Math.floor(Math.random() * 60 + 5)} mins
+    MMMM       MMMMMMM       MMMM       Shell: zsh 5.9
+    MMMM       MMMMMMM       MMMM       Resolution: Responsive x Liquid Glass
+                                        DE: Aqua-Tahoe 2026
+                                        WM: Quartz Compositor
+                                        Terminal: Tahoe-Console v2.6
+                                        CPU: Apple A18 Pro
+                                        Memory: 8 GB
+                                        Disk: 256 GB SSD (WebFS)`);
         break;
 
       case "date":
@@ -602,62 +685,6 @@ FLUTTER_ROOT=/usr/local/flutter`);
         push(`${new Date().toLocaleTimeString("es-AR")}  up ${Math.floor(Math.random() * 60 + 5)} mins, 1 user, load averages: 1.24 1.31 1.42`);
         break;
 
-      case "top":
-        push(`PID   COMMAND           CPU%   MEM
-  1   kernel_task       0.0    128MB
- 312   WindowServer      1.2    240MB
- 901   Chrome            4.5    580MB
-1023   Node.js           2.1    112MB
-2048   Terminal          0.1    24MB`);
-        break;
-
-      case "ps":
-        push(`  PID TTY        TIME CMD
-  312 s001   0:01.24 zsh
-  713 s001   0:00.12 node
- 1042 s001   0:00.08 npm`);
-        break;
-
-      case "node":
-        push(args.includes("-v") || args.includes("--version") ? "v20.15.0" : "zsh: interactive node not available in browser");
-        break;
-
-      case "npm":
-        if (args[0] === "-v" || args[0] === "--version") { push("10.7.0"); break; }
-        if (args[0] === "run" && args[1]) { push(`\n> ${args[1]}\n\nStarting ${args[1]}...\n✓ Ready in 843ms`, "success"); break; }
-        if (args[0] === "install") { push("\nadded 324 packages in 12s\n✓ Packages installed", "success"); break; }
-        if (args[0] === "list") { push("portafolio-mati-bazan@2.6.0\n├── next@16.3.1\n├── react@19.1.0\n├── framer-motion@12.23.6\n├── liquid-glass-react@1.6.2\n└── react-rnd@10.5.1"); break; }
-        push(`npm ${args.join(" ")}\n[ejecutado localmente]`);
-        break;
-
-      case "npx":
-        push(`[npx] Ejecutando ${args.join(" ")}...\n✓ Listo.`, "success");
-        break;
-
-      case "git": {
-        const sub = args[0];
-        if (!sub) { push("usage: git [--version] [--help] <command> [<args>]"); break; }
-        if (sub === "--version") { push("git version 2.45.2"); break; }
-        if (sub === "status") {
-          push("On branch main\nYour branch is up to date with 'origin/main'.\n\nnothing to commit, working tree clean", "success");
-        } else if (sub === "log") {
-          push(`commit a3f2d91 (HEAD -> main, origin/main)\nAuthor: Matias Bazan <matiasbazandev@gmail.com>\nDate:   ${new Date().toDateString()}\n\n    feat: interactive Notes app with search & sidebar\n\ncommit 7b1e843\nAuthor: Matias Bazan <matiasbazandev@gmail.com>\nDate:   Mon Aug 18 2026\n\n    feat: macOS Tahoe liquid glass desktop\n\ncommit 3c9a21f\nAuthor: Matias Bazan <matiasbazandev@gmail.com>\nDate:   Sat Aug 16 2026\n\n    init: Next.js project setup`);
-        } else if (sub === "branch") {
-          push("* main\n  dev\n  feature/notes-app");
-        } else if (sub === "diff") {
-          push("(working tree clean — no changes)");
-        } else if (sub === "clone") {
-          push(`Cloning into '${args[1] || "repo"}'...\nremote: Enumerating objects: 234, done.\n✓ Done`, "success");
-        } else if (sub === "pull") {
-          push("Already up to date.", "success");
-        } else if (sub === "push") {
-          push("Everything up-to-date.", "success");
-        } else {
-          push(`git: '${sub}' is not a git command. See 'git help'.`);
-        }
-        break;
-      }
-
       case "flutter":
         if (args[0] === "--version") { push("Flutter 3.24.0 • Dart 3.5.0 • DevTools 2.37.0"); break; }
         if (args[0] === "doctor") { push("Doctor summary:\n[✓] Flutter (Channel stable, 3.24.0)\n[✓] Xcode\n[✓] Chrome\n• No issues found!", "success"); break; }
@@ -666,7 +693,7 @@ FLUTTER_ROOT=/usr/local/flutter`);
         break;
 
       case "dart":
-        push(args[0] === "--version" ? "Dart SDK version: 3.5.0 (stable)" : `dart ${args.join(" ")} [simulated]`);
+        push(args[0] === "--version" ? "Dart SDK version: 3.5.0 (stable)" : `dart ${args.join(" ")} [simulado]`);
         break;
 
       case "about":
@@ -675,24 +702,29 @@ FLUTTER_ROOT=/usr/local/flutter`);
 └─────────────────────────────────────────────┘
 
 Programador Full Stack residente en Argentina.
-Especializado en diseñar interfaces web premium
+Especializado en diseñar interfaces web y movil
 y sistemas escalables con código limpio.
 
 Apasionado por la estetica, los detalles de UI
-y las experiencias interactivas cinematograficas.`);
+y las experiencias interactivas.`);
         break;
 
       case "skills":
         push(`Stack Tecnologico de Matias Bazan:
 
-  Flutter / Dart    ████████████████████░░  90%
-  React / Next.js   ████████████████████░░  90%
-  TypeScript        ████████████████░░░░░░  80%
-  NodeJS / Express  ████████████████░░░░░░  80%
-  PostgreSQL        ██████████████░░░░░░░░  70%
-  Git / GitHub      ████████████████████   100%
-  Figma / UI Design ████████████████░░░░░░  80%
-  Framer Motion     ██████████████████░░░░  85%`);
+  * Mobile / Frontend:
+    - Flutter / Dart
+    - HTML5 / CSS3 / JavaScript
+
+  * Backend / Bases de Datos:
+    - Node.js / Express
+    - PostgreSQL
+
+  * Sistema de control de versiones
+    - Git / GitHub
+  
+  * Herramientas / Diseño:
+    - Figma / UI Design`);
         break;
 
       case "experience":
@@ -713,7 +745,7 @@ y las experiencias interactivas cinematograficas.`);
       case "contact":
         push(`Puedes contactarme en:
 
-  Email     -> matiasbazandev@gmail.com
+  Email     -> bazanmatias2004@gmail.com
   GitHub    -> github.com/IamMatiasBazan
   LinkedIn  -> linkedin.com/in/matias-bazan
   Portfolio -> portafolio-matias-bazan.vercel.app`);
@@ -724,11 +756,6 @@ y las experiencias interactivas cinematograficas.`);
         setTerminalInput("");
         return;
 
-      case "beep":
-        playBeep();
-        push("beep!");
-        break;
-
       case "history":
         terminalHistory
           .filter(h => h.type === "input")
@@ -738,21 +765,6 @@ y las experiencias interactivas cinematograficas.`);
       case "man":
         if (!args[0]) { push("What manual page do you want?", "error"); break; }
         push(`MAN(1) - Manual for '${args[0]}'\n\nEscribi '${args[0]} --help' o 'help' para ver los comandos disponibles.`);
-        break;
-
-      case "open":
-        if (!args[0]) { push("open: missing argument", "error"); break; }
-        push(`Opening '${args[0]}'...`, "success");
-        if (args[0].startsWith("http")) window.open(args[0], "_blank");
-        break;
-
-      case "ping":
-        push(`PING ${args[0] || "google.com"} 56 bytes\n64 bytes: icmp_seq=0 ttl=55 time=12.3ms\n64 bytes: icmp_seq=1 ttl=55 time=11.8ms\n--- ping statistics ---\n2 packets, 0% packet loss`);
-        break;
-
-      case "curl":
-      case "wget":
-        push(`Fetching ${args[0] || "<url>"}...\n200 OK — Done`, "success");
         break;
 
       case "mkdir":
@@ -783,20 +795,8 @@ y las experiencias interactivas cinematograficas.`);
         push("./Documents/Proyectos/albus-dumbledore-web\n./Documents/Proyectos/johnny-depp-web\n./Documents/Proyectos/mario-bros-web\n./Documents/Proyectos/portafolio-premium\n./Documents/Proyectos/portafolio-mati-bazan");
         break;
 
-      case "which":
-        push(args[0] ? `/usr/local/bin/${args[0]}` : "which: missing argument");
-        break;
-
       case "code":
         push(args[0] ? `Opening '${args[0]}' in VS Code...` : "code . - Opening current directory in VS Code...", "success");
-        break;
-
-      case "sudo":
-        push("sudo: Password authentication required\nError: sudo requires root access — browser limitation.", "error");
-        break;
-
-      case "ssh":
-        push(`ssh: connect to host ${args[0] || "server"} established\n[Simulado - No se puede conectar en browser]`);
         break;
 
       case "exit":
@@ -818,12 +818,8 @@ y las experiencias interactivas cinematograficas.`);
 
   -- Sistema --------------------------------
   neofetch    Info del sistema macOS Tahoe
-  uname -a    Info del kernel
-  top         Procesos activos
-  ps          Lista de procesos
   date        Fecha y hora
   uptime      Tiempo activo
-  env         Variables de entorno
   whoami      Usuario actual
   hostname    Nombre del equipo
   history     Historial de comandos
@@ -831,13 +827,8 @@ y las experiencias interactivas cinematograficas.`);
   -- Archivos -------------------------------
   mkdir touch rm cp mv grep echo
 
-  -- Red ------------------------------------
-  ping curl wget open ssh
-
   -- Desarrollo -----------------------------
-  git [status|log|branch|push|pull|clone]
-  npm [run|install|list|--version]
-  node flutter dart npx code
+  flutter dart code
 
   -- Portfolio ------------------------------
   about       Sobre Matias Bazan
@@ -847,7 +838,6 @@ y las experiencias interactivas cinematograficas.`);
 
   -- Utilidades -----------------------------
   clear       Limpiar pantalla
-  beep        Reproducir bip
   man [cmd]   Manual de comandos
   exit        Cerrar terminal`);
         break;
@@ -898,23 +888,11 @@ y las experiencias interactivas cinematograficas.`);
               
             </span>
             {isAppleMenuOpen && (
-              <div className="absolute top-7 left-0 z-[9999999]">
-                <LiquidGlass
-                  cornerRadius={10}
-                  displacementScale={15}
-                  blurAmount={0.08}
-                  saturation={130}
-                  elasticity={0.2}
-                >
-                  <div className="w-52 p-1.5 text-white/90 flex flex-col font-sans">
-                    <div onClick={() => alert("Matias Portfolio macOS v2.6.0")} className="px-3 py-1 hover:bg-[#008FFE] hover:text-white rounded cursor-pointer text-xs">Acerca de este Mac</div>
-                    <div className="h-[1px] bg-white/10 my-1"></div>
-                    <div onClick={() => openApp("finder")} className="px-3 py-1 hover:bg-[#008FFE] hover:text-white rounded cursor-pointer text-xs">Preferencias del Sistema...</div>
-                    <div onClick={() => openApp("terminal")} className="px-3 py-1 hover:bg-[#008FFE] hover:text-white rounded cursor-pointer text-xs">Terminal de Diagnóstico</div>
-                    <div className="h-[1px] bg-white/10 my-1"></div>
-                    <div onClick={() => window.location.href = "../"} className="px-3 py-1 hover:bg-[#008FFE] hover:text-white rounded cursor-pointer text-xs">Volver al Portafolio 3D</div>
-                  </div>
-                </LiquidGlass>
+              <div className="absolute top-7 left-0 z-[9999999] bg-[#1a1c23]/85 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl w-52 p-1.5 text-white/95 flex flex-col font-sans">
+                <div onClick={() => openApp("finder")} className="px-3 py-1.5 hover:bg-[#007aff] hover:text-white rounded-md cursor-pointer text-[12px] font-normal transition duration-100">Preferencias del Sistema...</div>
+                <div onClick={() => openApp("terminal")} className="px-3 py-1.5 hover:bg-[#007aff] hover:text-white rounded-md cursor-pointer text-[12px] font-normal transition duration-100">Terminal de Diagnóstico</div>
+                <div className="h-[1px] bg-white/10 my-1"></div>
+                <div onClick={() => window.location.href = "../index.html"} className="px-3 py-1.5 hover:bg-[#007aff] hover:text-white rounded-md cursor-pointer text-[12px] font-normal transition duration-100">Volver al inicio</div>
               </div>
             )}
           </div>
@@ -923,46 +901,10 @@ y las experiencias interactivas cinematograficas.`);
           <span className="font-bold cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white">
             {activeWindow === "chrome" ? "Chrome" : activeWindow === "finder" ? "Finder" : activeWindow === "terminal" ? "Terminal" : "Finder"}
           </span>
-
-          {/* Menú Dinámico según la Aplicación */}
-          {activeWindow === "chrome" ? (
-            <>
-              <span className="hidden sm:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Archivo</span>
-              <span className="hidden sm:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Edición</span>
-              <span className="hidden md:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Visualización</span>
-              <span className="hidden md:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Historial</span>
-              <span className="hidden lg:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Marcadores</span>
-              <span className="hidden lg:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Perfiles</span>
-              <span className="hidden lg:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Pestaña</span>
-              <span className="hidden xl:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Ventana</span>
-              <span className="hidden xl:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Ayuda</span>
-            </>
-          ) : (
-            <>
-              <span className="hidden sm:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Archivo</span>
-              <span className="hidden sm:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Edición</span>
-              <span className="hidden md:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Visualización</span>
-              <span className="hidden md:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Ir</span>
-              <span className="hidden lg:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Ventana</span>
-              <span className="hidden lg:inline cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white/85 transition-all">Ayuda</span>
-            </>
-          )}
         </div>
 
         {/* Lado Derecho: Estado, Red, Hora */}
         <div className="flex items-center gap-3.5 relative">
-
-          {/* Icono de Fuente de Entrada / Letra B */}
-          <span className="cursor-pointer text-[12px] hover:bg-white/15 px-1.5 py-0.5 rounded font-sans text-white/95">
-            阝
-          </span>
-
-          {/* Indicador WiFi */}
-          <span onClick={() => setWifi(!wifi)}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-[15px] h-[15px] cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded box-content transition ${wifi ? "text-white" : "text-white/30"}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856a9.75 9.75 0 0 1 13.788 0M1.924 8.674a14.25 14.25 0 0 1 20.152 0M12.53 18.22a1.5 1.5 0 1 1-1.06-1.06 1.5 1.5 0 0 1 1.06 1.06Z" />
-            </svg>
-          </span>
 
           {/* Batería real con icono de barra */}
           <span className="cursor-pointer text-[11.5px] hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center gap-1.5 font-sans text-white/90 transition-all">
@@ -974,13 +916,6 @@ y las experiencias interactivas cinematograficas.`);
               />
               <div className="w-[1.5px] h-[3px] bg-white/70 absolute right-[-2.5px] top-[2px] rounded-r-[0.5px]" />
             </div>
-          </span>
-
-          {/* Búsqueda Spotlight */}
-          <span>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-[14px] h-[14px] cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded box-content">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z" />
-            </svg>
           </span>
 
           {/* Centro de Control */}
@@ -1102,21 +1037,98 @@ y las experiencias interactivas cinematograficas.`);
       {/* 4. CONTENEDOR MULTI-VENTANAS (Window System con react-rnd) */}
       <div className="absolute inset-0 z-[10] pointer-events-none select-none">
 
-        {/* ==================== APLICACIÓN: FINDER (CV) ==================== */}
-        {openWindows.finder.isOpen && !openWindows.finder.isMinimized && (
+        {/* ==================== APLICACIÓN: ADOBE ACROBAT (CV) ==================== */}
+        {openWindows.acrobat && openWindows.acrobat.isOpen && !openWindows.acrobat.isMinimized && (
           <Rnd
-            size={openWindows.finder.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.finder.size.width, height: openWindows.finder.size.height }}
-            position={openWindows.finder.isMaximized ? { x: 0, y: 0 } : { x: openWindows.finder.position.x, y: openWindows.finder.position.y }}
-            onDrag={(e, d) => {
-              if (openWindows.finder.isMaximized) return;
+            size={openWindows.acrobat.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.acrobat.size.width, height: openWindows.acrobat.size.height }}
+            position={openWindows.acrobat.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.acrobat.position.x, y: openWindows.acrobat.position.y }}
+            onDragStart={() => setIsDraggingActive(true)}
+            onDragStop={(e, d) => {
+              setIsDraggingActive(false);
+              if (openWindows.acrobat.isMaximized) return;
               setOpenWindows(prev => ({
                 ...prev,
-                finder: {
-                  ...prev.finder,
+                acrobat: {
+                  ...prev.acrobat,
                   position: { x: d.x, y: d.y }
                 }
               }));
             }}
+            onResizeStop={(e, direction, ref, delta, position) => {
+              if (openWindows.acrobat.isMaximized) return;
+              setOpenWindows(prev => ({
+                ...prev,
+                acrobat: {
+                  ...prev.acrobat,
+                  size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) },
+                  position
+                }
+              }));
+            }}
+            minWidth={300}
+            minHeight={200}
+            cancel=".window-control-buttons, input, iframe, button, a"
+            enableResizing={{
+              top: !openWindows.acrobat.isMaximized,
+              right: !openWindows.acrobat.isMaximized,
+              bottom: !openWindows.acrobat.isMaximized,
+              left: !openWindows.acrobat.isMaximized,
+              topRight: !openWindows.acrobat.isMaximized,
+              bottomRight: !openWindows.acrobat.isMaximized,
+              bottomLeft: !openWindows.acrobat.isMaximized,
+              topLeft: !openWindows.acrobat.isMaximized,
+            }}
+            disableDragging={openWindows.acrobat.isMaximized}
+            style={{
+              zIndex: openWindows.acrobat.zIndex,
+              pointerEvents: openWindows.acrobat.isMinimized ? "none" : "auto",
+              transform: openWindows.acrobat.isMinimized 
+                ? "scale(0.15) translateY(800px)" 
+                : "scale(1) translateY(0)",
+              opacity: openWindows.acrobat.isMinimized ? 0 : 1,
+              transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
+            }}
+            onClick={() => focusWindow("acrobat")}
+            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 transition-all duration-300 ${openWindows.acrobat.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+          >
+            <div className="w-full h-full flex flex-col">
+              {/* Header de Acrobat */}
+              <div className="window-header h-[46px] bg-[#2d2d2d] border-b border-black/30 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none text-white">
+                {/* Botones de control estilo macOS */}
+                <div className="flex gap-2 items-center window-control-buttons">
+                  <div onClick={(e) => closeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                  <div onClick={(e) => minimizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                  <div onClick={(e) => toggleMaximizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-[18px] h-[18px]">
+                    <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
+                    <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
+                  </svg>
+                  <span className="text-[13px] font-semibold text-white/90">Adobe Acrobat — CV_Matias_Bazan.pdf</span>
+                </div>
+                <div className="w-[60px]" /> {/* Spacer */}
+              </div>
+
+              {/* Cuerpo del PDF */}
+              <div className="flex flex-1 overflow-hidden bg-white">
+                <iframe
+                  src="/os/cv/CV-Matias-Bazan.pdf"
+                  className="w-full h-full border-none"
+                  style={{ pointerEvents: isDraggingActive ? "none" : "auto" }}
+                  title="CV Matias Bazan"
+                />
+              </div>
+            </div>
+          </Rnd>
+        )}
+
+        {/* ==================== APLICACIÓN: FINDER (Apple File Explorer) ==================== */}
+        {openWindows.finder && openWindows.finder.isOpen && !openWindows.finder.isMinimized && (
+          <Rnd
+            size={openWindows.finder.isMaximized ? { width: "100%", height: "calc(100% - 28px)" } : { width: openWindows.finder.size.width, height: openWindows.finder.size.height }}
+            position={openWindows.finder.isMaximized ? { x: 0, y: 28 } : isDraggingActive ? undefined : { x: openWindows.finder.position.x, y: openWindows.finder.position.y }}
+            onDragStart={() => setIsDraggingActive(true)}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
               if (openWindows.finder.isMaximized) return;
@@ -1139,9 +1151,9 @@ y las experiencias interactivas cinematograficas.`);
                 }
               }));
             }}
-            minWidth={300}
-            minHeight={200}
-            cancel=".window-control-buttons, input, iframe, button, a"
+            minWidth={550}
+            minHeight={350}
+            cancel=".window-control-buttons, input, .sidebar-link, button, a, .finder-draggable-item"
             enableResizing={{
               top: !openWindows.finder.isMaximized,
               right: !openWindows.finder.isMaximized,
@@ -1153,32 +1165,391 @@ y las experiencias interactivas cinematograficas.`);
               topLeft: !openWindows.finder.isMaximized,
             }}
             disableDragging={openWindows.finder.isMaximized}
-            style={{ zIndex: openWindows.finder.zIndex }}
+            style={{
+              zIndex: openWindows.finder.zIndex,
+              pointerEvents: openWindows.finder.isMinimized ? "none" : "auto",
+              transform: openWindows.finder.isMinimized 
+                ? "scale(0.15) translateY(800px)" 
+                : "scale(1) translateY(0)",
+              opacity: openWindows.finder.isMinimized ? 0 : 1,
+              transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
+            }}
             onClick={() => focusWindow("finder")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none ${openWindows.finder.isMinimized ? "hidden" : "block"}`}
+            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 text-white font-sans transition-all duration-300 ${openWindows.finder.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
-            <div className="w-full h-full flex flex-col">
-              {/* Header del Finder */}
-              <div className="window-header h-[46px] bg-white/5 border-b border-white/10 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none">
-                {/* Botones de control estilo macOS */}
-                <div className="flex gap-2 items-center window-control-buttons">
-                  <div onClick={(e) => closeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#C3B5E3] border border-[#A595CE] hover:opacity-80 cursor-pointer flex items-center justify-center" />
-                  <div onClick={(e) => toggleMaximizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+            <div className="w-full h-full flex flex-col bg-[#181a20] text-white overflow-hidden relative">
+
+              {/* Toolbar del Finder */}
+              <div className="window-header h-[52px] bg-[#1c1f26] border-b border-white/5 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                <div className="flex items-center gap-5">
+                  {/* Botones de control macOS */}
+                  <div className="flex gap-2 items-center window-control-buttons">
+                    <div onClick={(e) => closeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                    <div onClick={(e) => minimizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                    <div onClick={(e) => toggleMaximizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                  </div>
+
+                  {/* Botones de Navegación Atrás / Adelante */}
+                  <div className="flex gap-1 items-center font-sans">
+                    <button
+                      onClick={navigateFinderBack}
+                      disabled={finderHistoryIndex <= 0}
+                      className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                    <button
+                      onClick={navigateFinderForward}
+                      disabled={finderHistoryIndex >= finderHistory.length - 1}
+                      className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                  </div>
+
+                  {/* Título de la Carpeta Actual */}
+                  <span className="text-[14px] font-bold text-white/90 truncate max-w-[200px]">
+                    {finderPath.replace("~", "Home").split("/").pop()}
+                  </span>
                 </div>
-                <span className="text-[13px] font-bold text-white/90">Finder — Curriculum Vitae</span>
-                <div className="w-[60px]" /> {/* Spacer */}
+
+                {/* Controles de vista del Finder (Igual a la imagen) */}
+                <div className="flex items-center gap-4">
+                  {/* Grupo selector de layouts */}
+                  <div className="flex bg-white/5 border border-white/10 rounded-lg p-0.5 items-center">
+                    <button
+                      onClick={() => setFinderViewMode("grid")}
+                      className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "grid" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setFinderViewMode("list")}
+                      className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "list" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Barra de búsqueda */}
+                  <div className="relative flex items-center bg-white/5 rounded-lg border border-white/10 px-2.5 py-1 select-text">
+                    <Search className="w-3.5 h-3.5 text-white/40 mr-1.5 flex-shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Buscar"
+                      value={finderSearch}
+                      onChange={(e) => setFinderSearch(e.target.value)}
+                      className="bg-transparent border-none outline-none text-[11.5px] text-white placeholder-white/30 w-[110px] focus:w-[150px] transition-all p-0 font-sans"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Cuerpo del Finder (Visor PDF original de pantalla completa) */}
-              <div className="flex flex-1 overflow-hidden bg-white">
-                <iframe
-                  src="/os/cv/CV-Matias-Bazan.pdf"
-                  className="w-full h-full border-none"
-                  style={{ pointerEvents: isDraggingActive ? "none" : "auto" }}
-                  title="CV Matias Bazan"
-                />
+              {/* Contenido Principal de Finder */}
+              <div className="flex-1 flex overflow-hidden">
+
+                {/* Sidebar Izquierda (Categorías de macOS) */}
+                <div className="w-[185px] bg-[#121419]/70 border-r border-white/5 p-2.5 flex flex-col gap-4.5 shrink-0 select-none overflow-y-auto">
+
+                  {/* Favoritos */}
+                  <div>
+                    <span className="text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-2 block mb-1.5">Favoritos</span>
+                    <div className="flex flex-col gap-0.5">
+                      <div
+                        onClick={() => navigateToFinderFolder("~/Desktop")}
+                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath === "~/Desktop" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                      >
+                        <Monitor className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <span className="truncate">Escritorio</span>
+                      </div>
+                      <div
+                        onClick={() => navigateToFinderFolder("~/Documents")}
+                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath.startsWith("~/Documents") && !finderPath.includes("Proyectos") ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                      >
+                        <FileText className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <span className="truncate">Documentos</span>
+                      </div>
+                      <div
+                        onClick={() => navigateToFinderFolder("~")}
+                        className="sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] text-white/70 hover:bg-white/5 hover:text-white cursor-pointer"
+                      >
+                        <FileDown className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <span className="truncate">Descargas</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ubicaciones */}
+                  <div>
+                    <span className="text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-2 block mb-1.5">Ubicaciones</span>
+                    <div className="flex flex-col gap-0.5">
+                      <div
+                        onClick={() => navigateToFinderFolder("~")}
+                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath === "~" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                      >
+                        <HomeIcon className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <span className="truncate">matybazan</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Panel de Archivos (Grid de macOS) */}
+                <div className="flex-1 flex flex-col bg-[#181a20] overflow-hidden p-5 select-none">
+
+                  {/* Grid / List de Archivos */}
+                  <div ref={finderGridRef} className="flex-1 overflow-y-auto min-h-0 pointer-events-auto">
+                    {Object.keys(terminalFS[finderPath] || {}).length === 0 ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-white/20 gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.2} stroke="currentColor" className="w-12 h-12">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                        <span className="text-xs font-semibold">Carpeta Vacía</span>
+                      </div>
+                    ) : finderViewMode === "list" ? (
+                      /* List View Mode */
+                      <div className="w-full flex flex-col font-sans text-[12.5px] select-none text-white/95">
+                        <div className="flex border-b border-white/10 pb-2 mb-2 px-2 text-white/40 text-[11px] font-bold uppercase tracking-wider">
+                          <span className="w-1/2">Nombre</span>
+                          <span className="w-1/4">Clase</span>
+                          <span className="w-1/4">Tamaño</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          {Object.entries(terminalFS[finderPath] || {})
+                            .filter(([name]) => name.toLowerCase().includes(finderSearch.toLowerCase()))
+                            .map(([name, value]) => {
+                              const isFolder = value === null;
+                              const isPdf = name.toLowerCase().endsWith(".pdf") || name === "CV_Matias_Bazan.pdf";
+                              const isChromeShortcut = name === "Google Chrome";
+                              const isSelected = selectedFileName === name;
+
+                              let kind = "Archivo";
+                              if (isFolder) kind = "Carpeta";
+                              else if (isPdf) kind = "Documento PDF";
+                              else if (isChromeShortcut) kind = "Acceso directo";
+                              else if (name.endsWith(".json")) kind = "Configuración JSON";
+                              else if (name.endsWith(".md")) kind = "Documento Markdown";
+
+                              return (
+                                <div
+                                  key={name}
+                                  onClick={(e) => { e.stopPropagation(); setSelectedFileName(name); }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isFolder) {
+                                      const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
+                                      navigateToFinderFolder(nextPath);
+                                    } else if (isPdf) {
+                                      openApp("acrobat");
+                                    } else if (isChromeShortcut) {
+                                      openApp("chrome");
+                                    } else {
+                                      if (value && value.startsWith("[Archivo de GitHub")) {
+                                        const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
+                                        if (downloadUrl) {
+                                          setViewingFileContent({ name, content: "Cargando código de GitHub..." });
+                                          fetch(downloadUrl)
+                                            .then(res => res.text())
+                                            .then(content => {
+                                              setViewingFileContent({ name, content });
+                                              setTerminalFS(prev => {
+                                                const updated = { ...prev };
+                                                const currentDir = { ...(updated[finderPath] || {}) };
+                                                currentDir[name] = content;
+                                                updated[finderPath] = currentDir;
+                                                return updated;
+                                              });
+                                            })
+                                            .catch(() => {
+                                              setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
+                                            });
+                                        }
+                                      } else {
+                                        setViewingFileContent({ name, content: value || "" });
+                                      }
+                                    }
+                                  }}
+                                  className={`flex py-2 px-2.5 rounded-md cursor-pointer transition items-center ${isSelected ? "bg-[#2563eb]/30 text-white font-medium shadow-sm" : "hover:bg-white/5 text-white/80"
+                                    }`}
+                                >
+                                  <div className="w-1/2 flex items-center gap-2 truncate">
+                                    <span className="text-[15px]">{isFolder ? "📁" : isPdf ? "📄" : isChromeShortcut ? "🌐" : "📄"}</span>
+                                    <span className="truncate">{name}</span>
+                                  </div>
+                                  <span className="w-1/4 text-white/40 truncate">{kind}</span>
+                                  <span className="w-1/4 text-white/40">{isFolder ? "--" : "4 KB"}</span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Grid View Mode */
+                      <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8">
+                        {Object.entries(terminalFS[finderPath] || {})
+                          .filter(([name]) => name.toLowerCase().includes(finderSearch.toLowerCase()))
+                          .map(([name, value]) => {
+                            const isFolder = value === null;
+                            const isPdf = name.toLowerCase().endsWith(".pdf") || name === "CV_Matias_Bazan.pdf";
+                            const isChromeShortcut = name === "Google Chrome";
+                            const isPsd = name.toLowerCase().endsWith(".psd");
+                            const isZip = name.toLowerCase().endsWith(".zip");
+                            const isAi = name.toLowerCase().endsWith(".ai");
+                            const isMd = name.toLowerCase().endsWith(".md");
+
+                            const isSelected = selectedFileName === name;
+
+                            return (
+                              <motion.div
+                                drag
+                                dragConstraints={finderGridRef}
+                                dragElastic={0.08}
+                                dragMomentum={false}
+                                whileDrag={{ scale: 1.05, zIndex: 99, cursor: "grabbing" }}
+                                key={name}
+                                onClick={(e) => { e.stopPropagation(); setSelectedFileName(name); }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isFolder) {
+                                    const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
+                                    navigateToFinderFolder(nextPath);
+                                  } else if (isPdf) {
+                                    openApp("acrobat");
+                                  } else if (isChromeShortcut) {
+                                    openApp("chrome");
+                                  } else {
+                                    if (value && value.startsWith("[Archivo de GitHub")) {
+                                      const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
+                                      if (downloadUrl) {
+                                        setViewingFileContent({ name, content: "Cargando código de GitHub..." });
+                                        fetch(downloadUrl)
+                                          .then(res => res.text())
+                                          .then(content => {
+                                            setViewingFileContent({ name, content });
+                                            setTerminalFS(prev => {
+                                              const updated = { ...prev };
+                                              const currentDir = { ...(updated[finderPath] || {}) };
+                                              currentDir[name] = content;
+                                              updated[finderPath] = currentDir;
+                                              return updated;
+                                            });
+                                          })
+                                          .catch(() => {
+                                            setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
+                                          });
+                                      }
+                                    } else {
+                                      setViewingFileContent({ name, content: value || "" });
+                                    }
+                                  }
+                                }}
+                                className={`finder-draggable-item flex flex-col items-center p-2 rounded-lg cursor-pointer text-center select-none transition group relative ${isSelected ? "bg-[#2563eb]/30 border border-[#2563eb]/60" : "hover:bg-white/5 border border-transparent"
+                                  }`}
+                              >
+                                {/* Icono de Finder */}
+                                <div className="w-16 h-14 flex items-center justify-center drop-shadow-md transition duration-150 transform group-hover:scale-105">
+                                  {isFolder ? (
+                                    /* Carpeta macOS Sequoia exacta */
+                                    <svg className="w-13 h-11" viewBox="0 0 64 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M4 10C4 6.68629 6.68629 4 10 4H26L32 10H54C57.3137 10 60 12.6863 60 16V42C60 45.3137 57.3137 48 54 48H10C6.68629 48 4 45.3137 4 42V10Z" fill="#93a7d8" />
+                                      <path d="M4 14C4 11.7909 5.79086 10 8 10H56C58.2091 10 60 11.7909 60 14V42C60 45.3137 57.3137 48 54 48H10C6.68629 48 4 45.3137 4 42V14Z" fill="#859bce" />
+                                      <path d="M4 18H60V42C60 45.3137 57.3137 48 54 48H10C6.68629 48 4 45.3137 4 42V18Z" fill="#9db4e5" opacity="0.85" />
+                                    </svg>
+                                  ) : isChromeShortcut ? (
+                                    /* Chrome Icon */
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" className="w-11 h-11">
+                                      <path fill="#fff" d="M128.003 199.216c39.335 0 71.221-31.888 71.221-71.223S167.338 56.77 128.003 56.77S56.78 88.658 56.78 127.993s31.887 71.223 71.222 71.223" />
+                                      <path fill="#229342" d="M35.89 92.997Q27.92 79.192 17.154 64.02a127.98 127.98 0 0 0 110.857 191.981q17.671-24.785 23.996-35.74q12.148-21.042 31.423-60.251v-.015a63.993 63.993 0 0 1-110.857.017Q46.395 111.19 35.89 92.998" />
+                                      <path fill="#fbc116" d="M128.008 255.996A127.97 127.97 0 0 0 256 127.997A128 128 0 0 0 238.837 64q-36.372-3.585-53.686-3.585q-19.632 0-57.152 3.585l-.014.01a63.99 63.99 0 0 1 55.444 31.987a63.99 63.99 0 0 1-.001 64.01z" />
+                                      <path fill="#1a73e8" d="M128.003 178.677c27.984 0 50.669-22.685 50.669-50.67s-22.685-50.67-50.67-50.67c-27.983 0-50.669 22.686-50.669 50.67s22.686 50.67 50.67 50.67" />
+                                      <path fill="#e33b2e" d="M128.003 64.004H238.84a127.973 127.973 0 0 0-221.685.015l55.419 95.99l.015.008a63.993 63.993 0 0 1 55.415-96.014z" />
+                                    </svg>
+                                  ) : isZip ? (
+                                    /* Zip File Icon con cremallera */
+                                    <svg className="w-11 h-13" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <rect x="2" y="2" width="36" height="44" rx="4" fill="#ffffff" stroke="#c0c0c0" strokeWidth="2" />
+                                      <rect x="18" y="10" width="4" height="20" fill="#95a5a6" />
+                                      <path d="M16 12h8m-8 4h8m-8 4h8m-8 4h8" stroke="#34495e" strokeWidth="2" />
+                                      <rect x="15" y="26" width="10" height="6" rx="1" fill="#f1c40f" />
+                                      <span className="absolute bottom-[2px] right-[4px] text-[7.5px] bg-[#95a5a6] text-white px-1 rounded font-bold">ZIP</span>
+                                    </svg>
+                                  ) : isPsd ? (
+                                    /* PSD Illustrator layout style */
+                                    <div className="w-11 h-13 bg-[#0d2a4a] border border-[#1b508f] rounded-md relative flex items-center justify-center">
+                                      <span className="text-white text-xs font-bold font-sans">Ps</span>
+                                      <span className="absolute bottom-[1px] right-[2px] text-[6.5px] bg-[#0d2e5c] text-white/80 px-0.5 rounded font-black font-sans">PSD</span>
+                                    </div>
+                                  ) : isAi ? (
+                                    /* Illustrator Layout */
+                                    <div className="w-11 h-13 bg-[#261300] border border-[#d37300] rounded-md relative flex items-center justify-center">
+                                      <span className="text-[#ffd000] text-xs font-bold font-sans">Ai</span>
+                                      <span className="absolute bottom-[1px] right-[2px] text-[6.5px] bg-[#d37300] text-white px-0.5 rounded font-black font-sans">AI</span>
+                                    </div>
+                                  ) : isMd ? (
+                                    /* Document layout */
+                                    <svg className="w-11 h-13" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <rect x="2" y="2" width="36" height="44" rx="4" fill="#ffffff" stroke="#e0e0e0" strokeWidth="1.5" />
+                                      <path d="M8 12h24M8 18h24M8 24h16" stroke="#cccccc" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                  ) : isPdf ? (
+                                    /* Acrobat Icon */
+                                    <svg className="w-11 h-11" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                                      <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
+                                      <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
+                                    </svg>
+                                  ) : (
+                                    /* Archivo generico */
+                                    <svg className="w-11 h-13" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <rect x="2" y="2" width="36" height="44" rx="3" fill="#9CA3AF" />
+                                      <path d="M2 10h36" stroke="white" strokeWidth="2" />
+                                      <circle cx="12" cy="20" r="2" fill="white" />
+                                      <circle cx="12" cy="28" r="2" fill="white" />
+                                    </svg>
+                                  )}
+                                </div>
+
+                                {/* Texto del Archivo */}
+                                <span className={`text-[12px] mt-2 leading-tight line-clamp-2 select-none selection:bg-transparent ${isSelected ? "text-white font-semibold" : "text-white/85 group-hover:text-white"
+                                  }`}>
+                                  {name}
+                                </span>
+                              </motion.div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Barra de estado inferior de Finder */}
+                  <div className="h-[22px] border-t border-white/5 flex items-center justify-center shrink-0 mt-2 select-none">
+                    <span className="text-[10.5px] text-white/40">
+                      {Object.keys(terminalFS[finderPath] || {}).length} elementos, 1.25 TB disponibles
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* Vista Rápida Overlay (Quick Look) */}
+              {viewingFileContent && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-8 z-[100] pointer-events-auto">
+                  <div className="bg-[#1e1e1f] border border-white/10 rounded-2xl w-[600px] max-h-[80%] flex flex-col shadow-2xl overflow-hidden text-white font-sans">
+                    <div className="h-[44px] bg-[#141415] border-b border-white/5 flex items-center justify-between px-4">
+                      <span className="text-[13px] font-semibold text-white/90">{viewingFileContent.name}</span>
+                      <button
+                        onClick={() => setViewingFileContent(null)}
+                        className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[11.5px] font-medium transition cursor-pointer"
+                      >
+                        Cerrar Vista
+                      </button>
+                    </div>
+                    <div className="p-5 overflow-y-auto text-[13px] font-mono whitespace-pre-wrap leading-relaxed select-text text-white/80">
+                      {viewingFileContent.content}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </Rnd>
         )}
@@ -1234,9 +1605,17 @@ y las experiencias interactivas cinematograficas.`);
               topLeft: !openWindows.notes.isMaximized,
             }}
             disableDragging={openWindows.notes.isMaximized}
-            style={{ zIndex: openWindows.notes.zIndex }}
+            style={{
+              zIndex: openWindows.notes.zIndex,
+              pointerEvents: openWindows.notes.isMinimized ? "none" : "auto",
+              transform: openWindows.notes.isMinimized 
+                ? "scale(0.15) translateY(800px)" 
+                : "scale(1) translateY(0)",
+              opacity: openWindows.notes.isMinimized ? 0 : 1,
+              transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
+            }}
             onClick={() => focusWindow("notes")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none ${openWindows.notes.isMinimized ? "hidden" : "block"}`}
+            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.notes.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
             <div className="w-full h-full flex flex-col bg-[#272728] text-white font-sans overflow-hidden">
               {/* Header / Toolbar nativo estilo Apple Notes de macOS */}
@@ -1245,7 +1624,7 @@ y las experiencias interactivas cinematograficas.`);
                   {/* Botones de control macOS */}
                   <div className="flex gap-2 items-center window-control-buttons">
                     <div onClick={(e) => closeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                    <div onClick={(e) => minimizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#C3B5E3] border border-[#A595CE] hover:opacity-80 cursor-pointer flex items-center justify-center" />
+                    <div onClick={(e) => minimizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
                     <div onClick={(e) => toggleMaximizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
                   </div>
 
@@ -1303,8 +1682,8 @@ y las experiencias interactivas cinematograficas.`);
                   </div>
 
                   {notesList
-                    .filter(note => 
-                      note.title.toLowerCase().includes(notesSearch.toLowerCase()) || 
+                    .filter(note =>
+                      note.title.toLowerCase().includes(notesSearch.toLowerCase()) ||
                       note.content.toLowerCase().includes(notesSearch.toLowerCase())
                     )
                     .map(note => {
@@ -1314,9 +1693,8 @@ y las experiencias interactivas cinematograficas.`);
                         <div
                           key={note.id}
                           onClick={() => setActiveNoteId(note.id)}
-                          className={`p-3 rounded-xl border cursor-pointer transition relative group ${
-                            activeNoteId === note.id ? "bg-white/10 border-white/10" : "hover:bg-white/5 border-transparent"
-                          }`}
+                          className={`p-3 rounded-xl border cursor-pointer transition relative group ${activeNoteId === note.id ? "bg-white/10 border-white/10" : "hover:bg-white/5 border-transparent"
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-1.5">
                             <h4 className="text-[13px] font-semibold text-white mb-0.5 truncate">{note.title || "Nueva Nota"}</h4>
@@ -1594,7 +1972,7 @@ y las experiencias interactivas cinematograficas.`);
                               </div>
                             </div>
                           </>
-                        ) : ( activeNote.category === "experience" ? (
+                        ) : (activeNote.category === "experience" ? (
                           <>
                             <div className="text-[11px] text-white/40 text-center mb-6">{activeNote.date}</div>
                             <h1 className="text-3xl font-bold text-white mb-6">Experiencia Laboral</h1>
@@ -1684,16 +2062,24 @@ y las experiencias interactivas cinematograficas.`);
               topLeft: !openWindows.terminal.isMaximized,
             }}
             disableDragging={openWindows.terminal.isMaximized}
-            style={{ zIndex: openWindows.terminal.zIndex }}
+            style={{
+              zIndex: openWindows.terminal.zIndex,
+              pointerEvents: openWindows.terminal.isMinimized ? "none" : "auto",
+              transform: openWindows.terminal.isMinimized 
+                ? "scale(0.15) translateY(800px)" 
+                : "scale(1) translateY(0)",
+              opacity: openWindows.terminal.isMinimized ? 0 : 1,
+              transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
+            }}
             onClick={() => focusWindow("terminal")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none ${openWindows.terminal.isMinimized ? "hidden" : "block"}`}
+            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.terminal.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
             <div className="w-full h-full flex flex-col">
               {/* Header de Terminal */}
               <div className="window-header h-[36px] bg-black/60 border-b border-white/10 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none">
                 <div className="flex gap-2 items-center window-control-buttons">
                   <div onClick={(e) => closeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#C3B5E3] border border-[#A595CE] hover:opacity-80 cursor-pointer flex items-center justify-center" />
+                  <div onClick={(e) => minimizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
                   <div onClick={(e) => toggleMaximizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
                 </div>
                 <span className="text-[11.5px] font-mono text-white/50">matias@tahoe-mac: {terminalCwd} — zsh</span>
@@ -1701,7 +2087,7 @@ y las experiencias interactivas cinematograficas.`);
               </div>
 
               {/* Contenido Terminal */}
-              <div className="flex-1 bg-black/90 p-4 font-mono text-emerald-400 text-[12px] overflow-y-auto flex flex-col gap-1 leading-normal cursor-text">
+              <div ref={terminalContainerRef} className="flex-1 bg-black/90 p-4 font-mono text-emerald-400 text-[12px] overflow-y-auto flex flex-col gap-1 leading-normal cursor-text">
                 {terminalHistory.map((line, idx) => (
                   <div key={idx} className="whitespace-pre-wrap">
                     {line.type === "input" ? (
@@ -1785,10 +2171,18 @@ y las experiencias interactivas cinematograficas.`);
               topLeft: !openWindows.chrome.isMaximized,
             }}
             disableDragging={openWindows.chrome.isMaximized}
-            style={{ zIndex: openWindows.chrome.zIndex }}
+            style={{
+              zIndex: openWindows.chrome.zIndex,
+              pointerEvents: openWindows.chrome.isMinimized ? "none" : "auto",
+              transform: openWindows.chrome.isMinimized 
+                ? "scale(0.15) translateY(800px)" 
+                : "scale(1) translateY(0)",
+              opacity: openWindows.chrome.isMinimized ? 0 : 1,
+              transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
+            }}
             onClick={() => focusWindow("chrome")}
-            className={`absolute bg-[#b2cbdc] overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none ${openWindows.chrome.isMaximized ? "rounded-none border-none" : "border border-[#8da4b4] rounded-2xl"
-              } ${openWindows.chrome.isMinimized ? "hidden" : "block"}`}
+            className={`absolute bg-[#b2cbdc] overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.chrome.isMaximized ? "rounded-none border-none" : "border border-[#8da4b4] rounded-2xl"
+              } ${openWindows.chrome.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
             <div className="w-full h-full flex flex-col bg-[#b2cbdc]">
               {/* Header de Chrome: Tabs */}
@@ -1796,7 +2190,7 @@ y las experiencias interactivas cinematograficas.`);
                 {/* Botones de control estilo macOS */}
                 <div className="flex gap-2 items-center window-control-buttons mb-2.5">
                   <div onClick={(e) => closeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#C3B5E3] border border-[#A595CE] hover:opacity-80 cursor-pointer flex items-center justify-center" />
+                  <div onClick={(e) => minimizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
                   <div onClick={(e) => toggleMaximizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
                 </div>
 
@@ -2260,9 +2654,27 @@ y las experiencias interactivas cinematograficas.`);
       >
         <div className="index-dock-container px-[30px] py-[12px] rounded-[28px] flex items-end gap-[22px] shadow-2xl relative">
 
-          {/* Acrobat PDF Icon (Abre Finder) */}
+          {/* Finder Icon (Abre Finder) */}
           <motion.div
             onClick={() => openApp("finder")}
+            whileHover={{ scale: 1.25, y: -10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            className="flex flex-col items-center gap-0.5 relative group"
+          >
+            <div className="w-[52px] h-[52px] flex items-center justify-center cursor-pointer shadow-lg rounded-[14px] overflow-hidden">
+              <img src="/os/image.png" className="w-full h-full object-cover" alt="Finder" />
+            </div>
+            <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
+              Finder
+            </span>
+            {openWindows.finder.isOpen && (
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+            )}
+          </motion.div>
+
+          {/* Acrobat PDF Icon (Abre Acrobat / CV) */}
+          <motion.div
+            onClick={() => openApp("acrobat")}
             whileHover={{ scale: 1.25, y: -10 }}
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
@@ -2276,8 +2688,8 @@ y las experiencias interactivas cinematograficas.`);
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Mi CV
             </span>
-            {openWindows.finder.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white/70 absolute bottom-[-4px]" />
+            {openWindows.acrobat.isOpen && (
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -2301,7 +2713,7 @@ y las experiencias interactivas cinematograficas.`);
               Chrome
             </span>
             {openWindows.chrome.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white/70 absolute bottom-[-4px]" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -2319,7 +2731,7 @@ y las experiencias interactivas cinematograficas.`);
               Notas
             </span>
             {openWindows.notes.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white/70 absolute bottom-[-4px]" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -2337,7 +2749,7 @@ y las experiencias interactivas cinematograficas.`);
               Terminal
             </span>
             {openWindows.terminal.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white/70 absolute bottom-[-4px]" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
