@@ -87,16 +87,57 @@ export default function Home() {
   // Clock state
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
+  const [dayOfWeekShort, setDayOfWeekShort] = useState("Jue");
+  const [dayNumber, setDayNumber] = useState(20);
 
-  // Control Center dropdown state
+  // Control Center & Menu Bar states
   const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
   const [isAppleMenuOpen, setIsAppleMenuOpen] = useState(false);
+  const [isWifiMenuOpen, setIsWifiMenuOpen] = useState(false);
+  const [isBluetoothMenuOpen, setIsBluetoothMenuOpen] = useState(false);
 
-  // OS Audio & Brightness mockup levels
+  // OS Audio & Connectivity levels (Datos reales del Mac)
   const [volume, setVolume] = useState(80);
   const [brightness, setBrightness] = useState(90);
   const [wifi, setWifi] = useState(true);
+  const [selectedWifiSsid, setSelectedWifiSsid] = useState("HITRON-E050");
+  const [availableWifiNetworks, setAvailableWifiNetworks] = useState([
+    { ssid: "HITRON-E050", security: "WPA2 Personal", signal: "strong", locked: true, current: true },
+    { ssid: "A06 de Matias", security: "WPA2 Personal", signal: "strong", locked: true, current: false },
+    { ssid: "PLAZA DIGITAL-5G", security: "WPA3 Personal", signal: "strong", locked: true, current: false },
+    { ssid: "ELOY&DANTE", security: "WPA2 Personal", signal: "medium", locked: true, current: false },
+    { ssid: "HUAWEI-2.4G-M7gH", security: "WPA2 Personal", signal: "medium", locked: true, current: false },
+    { ssid: "TeleRed-A20E-5G", security: "WPA2 Personal", signal: "medium", locked: true, current: false },
+  ]);
+
   const [bluetooth, setBluetooth] = useState(true);
+  const [bluetoothDevices, setBluetoothDevices] = useState([
+    { id: "dn-n616", name: "DN-N616 (Mouse BLE)", icon: "🖱️", connected: true, battery: "100%", address: "12:DA:BC:88:B9:12" },
+    { id: "airpods-mati", name: "AirPods de Matias", icon: "🎧", connected: false, battery: "95%", address: "A4:83:E7:21:40:91" },
+    { id: "magic-keyboard", name: "Magic Keyboard", icon: "⌨️", connected: false, battery: "100%", address: "70:A8:D3:1A:E2:04" },
+  ]);
+
+  const connectedBtCount = bluetooth ? bluetoothDevices.filter(d => d.connected).length : 0;
+
+  // Feedback sonoro nativo estilo macOS al ajustar volumen
+  const playVolumeFeedback = (level: number) => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880; // A5 note
+      const gainVal = Math.max(0.005, (level / 100) * 0.12);
+      gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    } catch (e) {
+      // Ignorar si el navegador bloquea audio
+    }
+  };
 
   // Focus tracking state
   const [maxZIndex, setMaxZIndex] = useState(10);
@@ -110,6 +151,7 @@ export default function Home() {
     notes: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 250, y: 100 }, size: { width: 550, height: 380 }, minimizedPosition: { x: 280, y: 260 } },
     terminal: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 220, y: 110 }, size: { width: 620, height: 400 }, minimizedPosition: { x: 320, y: 300 } },
     chrome: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 180, y: 60 }, size: { width: 850, height: 530 }, minimizedPosition: { x: 90, y: 130 } },
+    calendar: { isOpen: false, isMaximized: false, isMinimized: false, zIndex: 10, position: { x: 200, y: 80 }, size: { width: 880, height: 560 }, minimizedPosition: { x: 160, y: 160 } },
   });
 
   // Chrome URL & Tabs states (Max 5 Tabs)
@@ -291,6 +333,225 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
   const [notesSearch, setNotesSearch] = useState("");
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
 
+  // Calendar App State (Apple Calendar Design with Events: Studies & Experience)
+  interface CalendarEvent {
+    id: string;
+    title: string;
+    category: "experience" | "education" | "milestone";
+    period: string;
+    institution: string;
+    location: string;
+    description: string;
+    skills: string[];
+    color: string;
+    year: number;
+    month: number; // 0-11
+    day: number;
+    logo?: string;
+  }
+
+  const calendarEvents: CalendarEvent[] = [
+    // 1. 04 Marzo 2022 — UNM
+    {
+      id: "edu-unm",
+      title: "Ingeniería en Electrónica",
+      category: "education",
+      period: "04 Mar 2022 — 10 Dic 2024",
+      institution: "Universidad Nacional de Moreno (UNM)",
+      location: "Moreno, Buenos Aires",
+      description: "Formación académica universitaria en la Universidad Nacional de Moreno (UNM). Fundamentos de ingeniería, cálculo, física aplicada, lógica computacional en lenguaje C e Introducción a Redes.",
+      skills: ["Lenguaje C", "Lógica de Programación", "Fundamentos de Ingeniería", "Redes & Protocolos", "UNM"],
+      color: "#FF9500", // Naranja Apple
+      year: 2022,
+      month: 2, // Marzo (0-indexed = 2)
+      day: 4,
+      logo: "/os/unm.jpeg"
+    },
+    // 2. 06 Marzo 2022 — CFP 402 (Inicio)
+    {
+      id: "edu-cfp402-inicio",
+      title: "Inicio: Curso de Programación Integral (10 Meses)",
+      category: "education",
+      period: "06 Mar 2022 — 12 Dic 2022",
+      institution: "C.F.P. N° 402 \"San Juan Diego\" (Moreno, Buenos Aires)",
+      location: "Moreno, Buenos Aires",
+      description: "Comienzo de la formación profesional intensiva de 10 meses. Aprendizaje de fundamentos sólidos de desarrollo: Algoritmos lógicos con PSeInt (estructuras condicionales y repetitivas), Programación Orientada a Objetos (POO), desarrollo web con HTML, CSS, PHP (GET, POST, PUT, DELETE) y bases de datos relacionales con MySQL (SELECT, INSERT, UPDATE, DELETE, JOINS).",
+      skills: ["PSeInt", "Lógica y Algoritmos", "POO", "PHP", "MySQL", "HTML/CSS"],
+      color: "#FF9500", // Naranja Apple
+      year: 2022,
+      month: 2, // Marzo (0-indexed = 2)
+      day: 6,
+      logo: "/os/cfp402.jpeg"
+    },
+    // 3. 10 Marzo 2022 — Argentina Programa 4.0
+    {
+      id: "edu-argentina-programa",
+      title: "Argentina Programa 4.0",
+      category: "education",
+      period: "10 Mar 2022 — 11 Jun 2022",
+      institution: "Argentina Programa 4.0 (Ministerio de Economía / Secretaría de Economía del Conocimiento)",
+      location: "Online / Argentina",
+      description: "Formación intensiva nacional en fundamentos computacionales, lógica algorítmica, estructuras de control, funciones y desarrollo de software básico con enfoque en inserción laboral tecnológica.",
+      skills: ["Lógica de Programación", "Algoritmos", "Estructuras de Control", "Desarrollo de Software"],
+      color: "#FF9500", // Naranja Apple
+      year: 2022,
+      month: 2, // Marzo (0-indexed = 2)
+      day: 10,
+      logo: "/os/argentina_programa4.0.png"
+    },
+    // 4. 01 Julio 2022 — Platzi Git & GitHub
+    {
+      id: "edu-platzi-git",
+      title: "Curso Profesional de Git y GitHub (22 hs)",
+      category: "education",
+      period: "Iniciado el 01 de Julio de 2022",
+      institution: "Platzi",
+      location: "Online",
+      description: "Certificación intensiva de 22 horas de teoría y práctica. Dominio avanzado de control de versiones, ramas (branching), merge, rebase, resolución de conflictos, flujos colaborativos en GitHub y gestión profesional de repositorios.",
+      skills: ["Git", "GitHub", "Control de Versiones", "Branching Strategies", "CI/CD"],
+      color: "#FF9500", // Naranja Apple
+      year: 2022,
+      month: 6, // Julio (0-indexed = 6)
+      day: 1,
+      logo: "/os/platzi.jpg"
+    },
+    // 5. 04 Julio 2022 — Platzi Terminal Linux
+    {
+      id: "edu-platzi-linux",
+      title: "Introducción a la Terminal y Línea de Comandos",
+      category: "education",
+      period: "Iniciado el 04 de Julio de 2022",
+      institution: "Platzi",
+      location: "Online",
+      description: "Formación de 11 horas de teoría y práctica sobre el entorno Unix/Linux. Navegación en sistemas de archivos, manipulación de permisos, variables de entorno, automatización de tareas y comandos esenciales mediante la terminal.",
+      skills: ["Linux", "Terminal", "Bash & Shell", "Línea de Comandos", "CLI"],
+      color: "#FF9500",
+      year: 2022,
+      month: 6, // Julio (0-indexed = 6)
+      day: 4,
+      logo: "/os/platzi.jpg"
+    },
+    // 6. 12 Diciembre 2022 — CFP 402 (Egreso)
+    {
+      id: "edu-cfp402-egreso",
+      title: "Egreso y Certificación: Programación Integral",
+      category: "education",
+      period: "12 de Diciembre de 2022",
+      institution: "C.F.P. N° 402 \"San Juan Diego\" (Moreno, Buenos Aires)",
+      location: "Moreno, Buenos Aires",
+      description: "Finalización y graduación con éxito del Curso de Programación Integral tras 10 meses de cursada continua, consolidando proyectos funcionales en PHP y MySQL con arquitecturas de backend estructuradas.",
+      skills: ["PHP Backend", "MySQL Relacional", "CRUD Completo", "PSeInt", "POO"],
+      color: "#FF9500",
+      year: 2022,
+      month: 11, // Diciembre (0-indexed = 11)
+      day: 12,
+      logo: "/os/cfp402.jpeg"
+    },
+    // 7. 19 Marzo 2023 — EducaciónIT HTTPS
+    {
+      id: "edu-educacionit-https",
+      title: "Protocolo HTTPS (9 hs)",
+      category: "education",
+      period: "19 de Marzo de 2023",
+      institution: "EducaciónIT",
+      location: "Online",
+      description: "Capacitación intensiva de 9 horas sobre seguridad en la web: funcionamiento del protocolo TLS/SSL, cifrado asimétrico/simétrico, certificados digitales y comunicación segura entre clientes y servidores.",
+      skills: ["HTTPS", "TLS/SSL", "Seguridad Web", "Criptografía", "Certificados Digitales"],
+      color: "#FF9500", // Naranja Apple
+      year: 2023,
+      month: 2, // Marzo (0-indexed = 2)
+      day: 19,
+      logo: "/os/educacionit.jpeg"
+    },
+    // 8. 25 Marzo 2023 — EducaciónIT Mundo Web
+    {
+      id: "edu-educacionit-web",
+      title: "Introducción al Mundo Web (12 hs)",
+      category: "education",
+      period: "25 de Marzo de 2023",
+      institution: "EducaciónIT",
+      location: "Online",
+      description: "Formación de 12 horas sobre arquitectura de Internet, modelo cliente-servidor, DNS, protocolos HTTP/HTTPS, hosting, dominios y estructura fundamental de aplicaciones web.",
+      skills: ["Arquitectura Web", "Cliente-Servidor", "DNS & Hosting", "HTTP/HTTPS", "Internet"],
+      color: "#FF9500",
+      year: 2023,
+      month: 2, // Marzo (0-indexed = 2)
+      day: 25,
+      logo: "/os/educacionit.jpeg"
+    },
+    // 9. Marzo 2025 — FLUiDevs (Freelance)
+    {
+      id: "exp-freelance",
+      title: "Programador Full Stack — FLUiDevs",
+      category: "experience",
+      period: "2025 — Actualidad",
+      institution: "FLUiDevs (Freelance / Independiente)",
+      location: "Remoto / Argentina",
+      description: "Desarrollo e implementación de soluciones completas de software bajo la marca FLUiDevs, con enfoque especializado en paneles de administración, lógica de backend con Node.js, ExpressJS y Prisma ORM, arquitectura de datos en PostgreSQL modelada en DrawDB y aplicaciones web/móviles con Flutter bajo metodología Spec Driven Development (Spec Kit).",
+      skills: ["FLUiDevs", "Flutter", "Node.js", "ExpressJS", "Prisma ORM", "PostgreSQL", "Spec Driven Development", "DrawDB"],
+      color: "#007AFF", // Azul Apple
+      year: 2025,
+      month: 2, // Marzo
+      day: 1,
+      logo: "/os/fluidevs-64.svg"
+    },
+    // 11. 01 Julio 2025 — Plaza Digital Flutter
+    {
+      id: "edu-plaza-flutter",
+      title: "Programación en Flutter",
+      category: "education",
+      period: "01 Jul 2025 — 15 Dic 2025",
+      institution: "Plaza Digital Moreno",
+      location: "Moreno, Buenos Aires",
+      description: "Formación completa en desarrollo multiplataforma con Flutter y Dart. Arquitectura de software, manejo de estado, integración de servicios REST y despliegue exitoso del proyecto final en Vercel.",
+      skills: ["Flutter", "Dart", "Vercel", "Mobile & Web", "State Management"],
+      color: "#FF9500",
+      year: 2025,
+      month: 6, // Julio (0-indexed = 6)
+      day: 1,
+      logo: "/os/plazadigital.jpeg"
+    },
+    // 12. 14 Febrero 2026 — Plaza Digital Diseño Gráfico
+    {
+      id: "edu-plaza-dg",
+      title: "Diseño Gráfico Profesional",
+      category: "education",
+      period: "14 Feb 2026 — 25 Jul 2026",
+      institution: "Plaza Digital Moreno",
+      location: "Moreno, Buenos Aires",
+      description: "Especialización integral en construcción de identidad visual, desarrollo de briefs de producto, moodboards conceptuales, tipografías, teoría del color, diseño de packaging y creación de marcas desde cero.",
+      skills: ["Figma", "Identidad Visual", "Tipografía", "Packaging", "Diseño de Marca"],
+      color: "#FF9500",
+      year: 2026,
+      month: 1, // Febrero (0-indexed = 1)
+      day: 14,
+      logo: "/os/plazadigital.jpeg"
+    },
+    // 13. 20 Agosto 2026 — Portafolio macOS Tahoe
+    {
+      id: "milestone-portafolio",
+      title: "Lanzamiento macOS Tahoe Portfolio",
+      category: "milestone",
+      period: "2026",
+      institution: "Proyecto Personal",
+      location: "Web Global",
+      description: "Diseño y desarrollo del sistema operativo virtual interactivo inspirado en macOS Tahoe 26, optimizado con simulación de ventanas, terminal Unix, explorador Finder e integración en Vercel.",
+      skills: ["Next.js", "React 19", "Tailwind CSS", "react-rnd", "Framer Motion"],
+      color: "#34C759", // Verde Apple
+      year: 2026,
+      month: 7, // Agosto
+      day: 20
+    }
+  ];
+
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(calendarEvents[0]);
+  const [calendarViewMode, setCalendarViewMode] = useState<"year" | "month" | "timeline" | "week" | "day">("year");
+  const [calendarYear, setCalendarYear] = useState(2022);
+  const [calendarMonth, setCalendarMonth] = useState(2); // Marzo 2022 (0-indexed)
+  const [calendarFilter, setCalendarFilter] = useState<"all" | "experience" | "education">("all");
+  const [calendarSearch, setCalendarSearch] = useState("");
+  const [isCalendarSearchOpen, setIsCalendarSearchOpen] = useState(false);
+
   const handleCreateNote = () => {
     const newId = `note-${Date.now()}`;
     const newNote: NoteItem = {
@@ -437,6 +698,8 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
       const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
       const formattedDate = `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
       setCurrentDate(formattedDate);
+      setDayOfWeekShort(days[date.getDay()]);
+      setDayNumber(date.getDate());
 
       // format time (e.g. 9:47 p.m.)
       let hours = date.getHours();
@@ -852,7 +1115,10 @@ y las experiencias interactivas.`);
   };
 
   return (
-    <div className="relative w-full h-full min-h-screen overflow-hidden select-none bg-[#a5dcff] text-white">
+    <div
+      className="relative w-full h-full min-h-screen overflow-hidden select-none bg-[#0d1117] text-white transition-[filter] duration-150"
+      style={{ filter: `brightness(${brightness}%)` }}
+    >
 
       {/* Fondo de pantalla Neo_Indigo.jpg */}
       <div
@@ -906,6 +1172,154 @@ y las experiencias interactivas.`);
         {/* Lado Derecho: Estado, Red, Hora */}
         <div className="flex items-center gap-3.5 relative">
 
+          {/* Icono de Wi-Fi */}
+          <div className="relative">
+            <span
+              onClick={() => {
+                setIsWifiMenuOpen(!isWifiMenuOpen);
+                setIsBluetoothMenuOpen(false);
+                setIsControlCenterOpen(false);
+                setIsAppleMenuOpen(false);
+              }}
+              className="cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center transition-all duration-150"
+              title="Wi-Fi"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={`w-[14px] h-[14px] ${wifi ? "text-white" : "text-white/40"}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M1.34 8.89a14 14 0 0 1 21.32 0M12 20h.01" />
+              </svg>
+            </span>
+
+            {/* Dropdown de Wi-Fi Interactivo */}
+            {isWifiMenuOpen && (
+              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl w-72 p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${wifi ? "bg-[#007AFF] text-white" : "bg-white/10 text-white/50"}`}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M1.34 8.89a14 14 0 0 1 21.32 0M12 20h.01" /></svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold">Wi-Fi</div>
+                      <div className="text-[10px] text-white/50">{wifi ? selectedWifiSsid : "Desactivado"}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setWifi(!wifi)}
+                    className={`w-9 h-5 rounded-full transition-colors relative p-0.5 ${wifi ? "bg-[#34C759]" : "bg-white/20"}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${wifi ? "translate-x-4" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {wifi ? (
+                  <div className="pt-2 flex flex-col gap-1.5">
+                    <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-1">Redes disponibles</div>
+                    {availableWifiNetworks.map(net => {
+                      const isConnected = selectedWifiSsid === net.ssid;
+                      return (
+                        <div
+                          key={net.ssid}
+                          onClick={() => setSelectedWifiSsid(net.ssid)}
+                          className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer ${
+                            isConnected ? "bg-white/15 border border-white/20" : "hover:bg-white/10 border border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs ${isConnected ? "text-[#34C759]" : "text-transparent"}`}>✓</span>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white/90">{net.ssid}</span>
+                              <span className="text-[9.5px] text-white/40">{net.security}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 text-white/60">
+                            {net.locked && (
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white/40"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            )}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M12 20h.01" /></svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-4 text-center text-xs text-white/40">
+                    El Wi-Fi está apagado
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Icono de Bluetooth */}
+          <div className="relative">
+            <span
+              onClick={() => {
+                setIsBluetoothMenuOpen(!isBluetoothMenuOpen);
+                setIsWifiMenuOpen(false);
+                setIsControlCenterOpen(false);
+                setIsAppleMenuOpen(false);
+              }}
+              className="cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center transition-all duration-150"
+              title="Bluetooth"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={`w-[14px] h-[14px] ${bluetooth ? "text-white" : "text-white/40"}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m7 7 10 10-5 5V2l5 5L7 17" />
+              </svg>
+            </span>
+
+            {/* Dropdown de Bluetooth */}
+            {isBluetoothMenuOpen && (
+              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl w-72 p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${bluetooth ? "bg-[#007AFF] text-white" : "bg-white/10 text-white/50"}`}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m7 7 10 10-5 5V2l5 5L7 17" /></svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold">Bluetooth</div>
+                      <div className="text-[10px] text-white/50">{bluetooth ? `${connectedBtCount} conectados` : "Desactivado"}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setBluetooth(!bluetooth)}
+                    className={`w-9 h-5 rounded-full transition-colors relative p-0.5 ${bluetooth ? "bg-[#34C759]" : "bg-white/20"}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${bluetooth ? "translate-x-4" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {bluetooth ? (
+                  <div className="pt-2 flex flex-col gap-1.5">
+                    <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-1">Dispositivos conocidos</div>
+                    {bluetoothDevices.map(dev => (
+                      <div
+                        key={dev.id}
+                        onClick={() => {
+                          setBluetoothDevices(prev => prev.map(d => d.id === dev.id ? { ...d, connected: !d.connected } : d));
+                        }}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-sm">{dev.icon}</span>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-white/90">{dev.name}</span>
+                            <span className="text-[9.5px] text-white/40">Batería: {dev.battery}</span>
+                          </div>
+                        </div>
+                        <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full ${dev.connected ? "bg-[#34C759]/20 text-[#34C759] border border-[#34C759]/30" : "text-white/40 bg-white/5"}`}>
+                          {dev.connected ? "Conectado" : "Conectar"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-4 text-center text-xs text-white/40">
+                    Bluetooth desactivado
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Batería real con icono de barra */}
           <span className="cursor-pointer text-[11.5px] hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center gap-1.5 font-sans text-white/90 transition-all">
             <span>{batteryLevel !== null ? `${batteryLevel}%` : "80%"}</span>
@@ -918,23 +1332,118 @@ y las experiencias interactivas.`);
             </div>
           </span>
 
-          {/* Centro de Control */}
-          <span
-            onClick={() => { setIsControlCenterOpen(!isControlCenterOpen); setIsAppleMenuOpen(false); }}
-            className="cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center transition-all duration-150"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              className="w-[15px] h-[15px]"
+          {/* Centro de Control de macOS */}
+          <div className="relative">
+            <span
+              onClick={() => {
+                setIsControlCenterOpen(!isControlCenterOpen);
+                setIsAppleMenuOpen(false);
+                setIsWifiMenuOpen(false);
+                setIsBluetoothMenuOpen(false);
+              }}
+              className={`cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center transition-all duration-150 ${isControlCenterOpen ? "bg-white/20" : ""}`}
+              title="Centro de Control"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18M3 15h18" />
-              <circle cx="8" cy="9" r="1.8" fill="currentColor" />
-              <circle cx="16" cy="15" r="1.8" fill="currentColor" />
-            </svg>
-          </span>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="w-[15px] h-[15px]"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18M3 15h18" />
+                <circle cx="8" cy="9" r="1.8" fill="currentColor" />
+                <circle cx="16" cy="15" r="1.8" fill="currentColor" />
+              </svg>
+            </span>
+
+            {/* Dropdown del Centro de Control Completo estilo Apple Sequoia */}
+            {isControlCenterOpen && (
+              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-3xl border border-white/15 rounded-3xl shadow-2xl w-80 p-3.5 text-white flex flex-col gap-3 font-sans animate-in fade-in zoom-in-95 duration-150 select-none">
+                
+                {/* Cuadrícula Superior de Conectividad (Wi-Fi y Bluetooth) */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  
+                  {/* Wi-Fi Tile */}
+                  <div
+                    onClick={() => setWifi(!wifi)}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
+                      wifi ? "bg-[#007AFF] border-[#007AFF] text-white shadow-md shadow-blue-500/25" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${wifi ? "bg-white/20" : "bg-white/10"}`}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M1.34 8.89a14 14 0 0 1 21.32 0M12 20h.01" /></svg>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <div className="text-xs font-bold leading-tight">Wi-Fi</div>
+                      <div className="text-[10px] opacity-80 truncate">{wifi ? selectedWifiSsid : "Desactivado"}</div>
+                    </div>
+                  </div>
+
+                  {/* Bluetooth Tile */}
+                  <div
+                    onClick={() => setBluetooth(!bluetooth)}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
+                      bluetooth ? "bg-[#007AFF] border-[#007AFF] text-white shadow-md shadow-blue-500/25" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${bluetooth ? "bg-white/20" : "bg-white/10"}`}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m7 7 10 10-5 5V2l5 5L7 17" /></svg>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="text-xs font-bold leading-tight">Bluetooth</div>
+                      <div className="text-[10px] opacity-80">{bluetooth ? `${connectedBtCount} conectados` : "Desactivado"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Control Deslizante de Brillo de Pantalla (Real) */}
+                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col gap-1.5 shadow-inner">
+                  <div className="flex justify-between items-center text-[11px] font-medium text-white/80">
+                    <span className="flex items-center gap-1.5">☀️ Brillo de Pantalla</span>
+                    <span className="font-mono text-white/60">{brightness}%</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs text-white/40">🔅</span>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      value={brightness}
+                      onChange={(e) => setBrightness(Number(e.target.value))}
+                      className="w-full accent-[#007AFF] h-2 bg-white/20 rounded-lg cursor-pointer transition-all"
+                    />
+                    <span className="text-xs text-white/40">🔆</span>
+                  </div>
+                </div>
+
+                {/* Control Deslizante de Sonido / Volumen (Real con Beep) */}
+                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col gap-1.5 shadow-inner">
+                  <div className="flex justify-between items-center text-[11px] font-medium text-white/80">
+                    <span className="flex items-center gap-1.5">🔊 Volumen del Sistema</span>
+                    <span className="font-mono text-white/60">{volume}%</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs text-white/40">🔈</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volume}
+                      onChange={(e) => {
+                        const newVol = Number(e.target.value);
+                        setVolume(newVol);
+                        playVolumeFeedback(newVol);
+                      }}
+                      className="w-full accent-[#007AFF] h-2 bg-white/20 rounded-lg cursor-pointer transition-all"
+                    />
+                    <span className="text-xs text-white/40">🔊</span>
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
 
           {/* Fecha y Hora en tiempo real */}
           <span className="cursor-pointer hover:bg-white/15 px-2 py-0.5 rounded select-none font-normal text-white/95">
@@ -946,16 +1455,28 @@ y las experiencias interactivas.`);
       {/* Cierre de dropdowns al hacer click en el escritorio */}
       <div
         className="absolute inset-0 z-[1]"
-        onClick={() => { setIsControlCenterOpen(false); setIsAppleMenuOpen(false); }}
+        onClick={() => {
+          setIsControlCenterOpen(false);
+          setIsAppleMenuOpen(false);
+          setIsWifiMenuOpen(false);
+          setIsBluetoothMenuOpen(false);
+        }}
       />
 
       {/* 2. COLUMNA DE WIDGETS DE ESCRITORIO (Lado Izquierdo) */}
       <div className="absolute top-[48px] left-[24px] z-[5] flex flex-col gap-4 select-none pointer-events-auto">
 
-        {/* Widget 1: Calendario */}
-        <div className="w-[145px] h-[145px] liquid-glass rounded-[24px] p-3 text-black flex flex-col justify-between font-sans shadow-lg">
+        {/* Widget 1: Calendario (Abre App Calendario) */}
+        <div
+          onClick={() => openApp("calendar")}
+          className="w-[145px] h-[145px] liquid-glass rounded-[24px] p-3 text-black flex flex-col justify-between font-sans shadow-lg cursor-pointer hover:scale-[1.03] transition-all group"
+          title="Abrir Calendario"
+        >
           <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-red-600 tracking-wider">AGOSTO</span>
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold text-red-600 tracking-wider">AGOSTO</span>
+              <span className="text-[8px] font-semibold text-black/40 group-hover:text-red-500 transition">Ver ↗</span>
+            </div>
             <div className="grid grid-cols-7 text-[8px] font-bold text-black/55 text-center mt-1">
               <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
             </div>
@@ -963,35 +1484,14 @@ y las experiencias interactivas.`);
               <span className="text-black/30">3</span><span className="text-black/30">4</span><span className="text-black/30">5</span><span className="text-black/30">6</span><span className="text-black/30">7</span><span>1</span><span>2</span>
               <span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
               <span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
-              {/* Resaltamos el 17 en un círculo blanco */}
-              <span className="bg-white text-black font-bold rounded-full flex items-center justify-center w-4 h-4 mx-auto shadow-sm">17</span>
-              <span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span>
+              <span>17</span><span>18</span><span>19</span>
+              {/* Resaltamos el día actual con fondo blanco */}
+              <span className="bg-white text-black font-bold rounded-full flex items-center justify-center w-4 h-4 mx-auto shadow-sm">{dayNumber}</span>
+              <span>21</span><span>22</span><span>23</span>
               <span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span>
               <span>31</span>
             </div>
           </div>
-        </div>
-
-        {/* Widget 2: Clima */}
-        <div className="w-[145px] h-[145px] liquid-glass rounded-[24px] p-4 text-black flex flex-col justify-between font-sans shadow-lg">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[11px] font-bold text-black/75 flex items-center gap-1">Moreno 🧭</span>
-            <span className="text-[34px] font-light leading-none my-1 tracking-tighter">14°</span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-black/80">Mayormente nublado</span>
-            <span className="text-[9px] text-black/60 font-semibold">Máx. 15° Mín. 10°</span>
-          </div>
-        </div>
-
-        {/* Widget 3: Fotos */}
-        <div className="w-[145px] h-[145px] liquid-glass rounded-[24px] p-4 text-black flex flex-col justify-between font-sans shadow-lg items-center text-center">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xl shadow-sm border border-white/20 mt-1">
-            🌸
-          </div>
-          <p className="text-[9px] text-black/65 font-medium leading-normal mb-1">
-            Las fotos aparecerán aquí cuando se hayan terminado de procesar.
-          </p>
         </div>
       </div>
 
@@ -2586,6 +3086,633 @@ y las experiencias interactivas.`);
             </div>
           </Rnd>
         )}
+
+        {/* ==================== APLICACIÓN: CALENDARIO DE APPLE (Diseño Nativo macOS Tahoe) ==================== */}
+        {openWindows.calendar && openWindows.calendar.isOpen && !openWindows.calendar.isMinimized && (
+          <Rnd
+            size={openWindows.calendar.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.calendar.size.width, height: openWindows.calendar.size.height }}
+            position={openWindows.calendar.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.calendar.position.x, y: openWindows.calendar.position.y }}
+            onDragStart={() => setIsDraggingActive(true)}
+            onDragStop={(e, d) => {
+              setIsDraggingActive(false);
+              if (openWindows.calendar.isMaximized) return;
+              setOpenWindows(prev => ({
+                ...prev,
+                calendar: {
+                  ...prev.calendar,
+                  position: { x: d.x, y: d.y }
+                }
+              }));
+            }}
+            onResizeStop={(e, direction, ref, delta, position) => {
+              if (openWindows.calendar.isMaximized) return;
+              setOpenWindows(prev => ({
+                ...prev,
+                calendar: {
+                  ...prev.calendar,
+                  size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) },
+                  position
+                }
+              }));
+            }}
+            minWidth={720}
+            minHeight={480}
+            cancel=".window-control-buttons, input, button, select, .no-drag"
+            enableResizing={{
+              top: !openWindows.calendar.isMaximized,
+              right: !openWindows.calendar.isMaximized,
+              bottom: !openWindows.calendar.isMaximized,
+              left: !openWindows.calendar.isMaximized,
+              topRight: !openWindows.calendar.isMaximized,
+              bottomRight: !openWindows.calendar.isMaximized,
+              bottomLeft: !openWindows.calendar.isMaximized,
+              topLeft: !openWindows.calendar.isMaximized,
+            }}
+            disableDragging={openWindows.calendar.isMaximized}
+            style={{
+              zIndex: openWindows.calendar.zIndex,
+              display: openWindows.calendar.isOpen && !openWindows.calendar.isMinimized ? "block" : "none"
+            }}
+            className="absolute"
+          >
+            <div
+              onClick={() => focusWindow("calendar")}
+              className="w-full h-full bg-[#1e222d]/95 backdrop-blur-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 text-white font-sans"
+            >
+              {/* Header / Barra de Título Apple Calendar Exacta a la Captura */}
+              <div className="h-[52px] bg-[#1a1d26]/90 border-b border-white/5 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                {/* Lado Izquierdo: Botones Semáforo + Botones de Vista/Acciones Apple */}
+                <div className="flex items-center gap-4">
+                  {/* Semáforo macOS */}
+                  <div className="flex gap-2 items-center window-control-buttons">
+                    <div
+                      onClick={(e) => closeApp("calendar", e)}
+                      className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:bg-[#ff493d] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
+                    >
+                      ×
+                    </div>
+                    <div
+                      onClick={(e) => minimizeApp("calendar", e)}
+                      className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:bg-[#e6a81e] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
+                    >
+                      –
+                    </div>
+                    <div
+                      onClick={(e) => toggleMaximizeApp("calendar", e)}
+                      className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:bg-[#1fd339] cursor-pointer flex items-center justify-center text-[7px] text-black font-bold shadow-sm"
+                    >
+                      +
+                    </div>
+                  </div>
+
+                  {/* Iconos de Barra de Herramientas Apple Calendar */}
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 no-drag">
+                    <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
+                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z"/></svg>
+                    </button>
+                    <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
+                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    </button>
+                  </div>
+
+                  {/* Botones de acción rápida: + y Alerta */}
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 no-drag">
+                    <button className="px-2 py-1 hover:bg-white/10 rounded text-xs font-bold text-white/70 hover:text-white transition">
+                      +
+                    </button>
+                    <button className="px-2 py-1 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition">
+                      ⚠️
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lado Derecho: Switcher (Día, Semana, Mes, Año) + Búsqueda */}
+                <div className="flex items-center gap-3 no-drag">
+                  {/* Selector de Vistas estilo Apple (Día / Semana / Mes / Año / Cronología) */}
+                  <div className="flex bg-black/40 border border-white/10 rounded-lg p-1 text-[12px] font-medium text-white/75">
+                    <button
+                      onClick={() => setCalendarViewMode("year")}
+                      className={`px-3 py-0.5 rounded-md transition ${calendarViewMode === "year" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                    >
+                      Año
+                    </button>
+                    <button
+                      onClick={() => setCalendarViewMode("month")}
+                      className={`px-3 py-0.5 rounded-md transition ${calendarViewMode === "month" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                    >
+                      Mes
+                    </button>
+                    <button
+                      onClick={() => setCalendarViewMode("timeline")}
+                      className={`px-3 py-0.5 rounded-md transition flex items-center gap-1.5 ${calendarViewMode === "timeline" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                    >
+                      <span>📜</span>
+                      <span>Cronología</span>
+                    </button>
+                  </div>
+
+                  {/* Botón y Barra de Búsqueda Interactiva Apple */}
+                  <div className="relative flex items-center">
+                    {isCalendarSearchOpen ? (
+                      <div className="flex items-center gap-2 bg-black/50 border border-white/20 rounded-full px-3 py-1 text-xs text-white backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-150">
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-current stroke-2 text-white/50"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        <input
+                          type="text"
+                          value={calendarSearch}
+                          onChange={(e) => setCalendarSearch(e.target.value)}
+                          placeholder="Buscar eventos, tecnologías..."
+                          autoFocus
+                          className="bg-transparent border-none outline-none text-xs text-white placeholder-white/40 w-44 font-sans"
+                        />
+                        {calendarSearch && (
+                          <button
+                            onClick={() => setCalendarSearch("")}
+                            className="text-white/40 hover:text-white text-xs font-bold"
+                          >
+                            ×
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setIsCalendarSearchOpen(false);
+                            setCalendarSearch("");
+                          }}
+                          className="text-[11px] text-white/60 hover:text-white pl-1 border-l border-white/10"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsCalendarSearchOpen(true)}
+                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition shadow-sm"
+                        title="Buscar en Calendario"
+                      >
+                        <svg viewBox="0 0 24 24" className="w-4 h-4 fill-none stroke-current stroke-2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-cabecera con Año Dinámico, Selector Rápido de Años y Botón "Hoy" */}
+              <div className="px-8 pt-5 pb-3 flex justify-between items-center no-drag border-b border-white/5">
+                <div className="flex items-center gap-4">
+                  <h1 className="text-4xl font-extrabold tracking-tight text-white/95 font-sans">
+                    {calendarYear}
+                  </h1>
+
+                  {/* Selector Rápido de Años para navegar trayectoria */}
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5">
+                    {[2022, 2023, 2024, 2025, 2026].map(y => (
+                      <button
+                        key={y}
+                        onClick={() => {
+                          setCalendarYear(y);
+                          if (calendarViewMode !== "year" && calendarViewMode !== "timeline") {
+                            setCalendarViewMode("year");
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-semibold transition ${calendarYear === y ? "bg-[#007AFF] text-white shadow-sm" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCalendarYear(prev => Math.max(2020, prev - 1))}
+                    className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
+                    title="Año anterior"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => { setCalendarYear(2026); setCalendarMonth(7); setCalendarViewMode("year"); }}
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-white/90 transition shadow-sm"
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    onClick={() => setCalendarYear(prev => Math.min(2030, prev + 1))}
+                    className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
+                    title="Año siguiente"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenedor Principal: Vistas de Calendario */}
+              <div className="flex-1 overflow-y-auto px-8 py-5 no-drag">
+                {/* Panel de Resultados de Búsqueda Activa */}
+                {calendarSearch.trim() ? (
+                  <div className="max-w-4xl mx-auto flex flex-col gap-4 pb-6">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>🔍 Resultados para</span>
+                        <span className="text-[#007AFF]">"{calendarSearch}"</span>
+                      </h2>
+                      <button
+                        onClick={() => setCalendarSearch("")}
+                        className="text-xs text-white/50 hover:text-white"
+                      >
+                        Limpiar búsqueda
+                      </button>
+                    </div>
+
+                    {calendarEvents.filter(ev => {
+                      const q = calendarSearch.toLowerCase();
+                      return (
+                        ev.title.toLowerCase().includes(q) ||
+                        ev.institution.toLowerCase().includes(q) ||
+                        ev.description.toLowerCase().includes(q) ||
+                        ev.period.toLowerCase().includes(q) ||
+                        ev.skills.some(s => s.toLowerCase().includes(q))
+                      );
+                    }).length === 0 ? (
+                      <div className="py-12 text-center text-white/40">
+                        <p className="text-sm">No se encontraron eventos o tecnologías que coincidan con tu búsqueda.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {calendarEvents
+                          .filter(ev => {
+                            const q = calendarSearch.toLowerCase();
+                            return (
+                              ev.title.toLowerCase().includes(q) ||
+                              ev.institution.toLowerCase().includes(q) ||
+                              ev.description.toLowerCase().includes(q) ||
+                              ev.period.toLowerCase().includes(q) ||
+                              ev.skills.some(s => s.toLowerCase().includes(q))
+                            );
+                          })
+                          .map(ev => (
+                            <div
+                              key={ev.id}
+                              onClick={() => {
+                                setSelectedCalendarEvent(ev);
+                                setCalendarYear(ev.year);
+                                setCalendarMonth(ev.month);
+                              }}
+                              className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-4 ${
+                                selectedCalendarEvent?.id === ev.id
+                                  ? "bg-white/15 border-white/30 shadow-lg"
+                                  : "bg-white/5 border-white/10 hover:bg-white/10"
+                              }`}
+                            >
+                              <div
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-sm text-white shrink-0 mt-0.5 overflow-hidden border border-white/15 bg-white/10 shadow-sm"
+                                style={!ev.logo ? { backgroundColor: ev.color } : {}}
+                              >
+                                {ev.logo ? (
+                                  <img src={ev.logo} alt={ev.institution} className="w-full h-full object-cover" />
+                                ) : (
+                                  ev.category === "experience" ? "💼" : ev.category === "education" ? "🎓" : "🚀"
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                  <h4 className="text-sm font-bold text-white">{ev.title}</h4>
+                                  <span className="text-xs font-mono text-white/50">{ev.period}</span>
+                                </div>
+                                <div className="text-xs text-white/75 font-medium mt-0.5">
+                                  {ev.institution} • {ev.location}
+                                </div>
+                                <p className="text-xs text-white/60 mt-1 line-clamp-2">{ev.description}</p>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {ev.skills.map((skill, sIdx) => (
+                                    <span key={sIdx} className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-mono text-white/80">
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                ) : calendarViewMode === "timeline" ? (
+                  /* ==================== VISTA CRONOLOGÍA / LÍNEA DE TIEMPO (2022 — 2026) ==================== */
+                  <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Cronología de Trayectoria Profesional & Académica</h2>
+                        <p className="text-xs text-white/60 mt-0.5">Evolución técnica desde los primeros fundamentos algorítmicos hasta la arquitectura Full Stack en producción.</p>
+                      </div>
+
+                      {/* Filtros de Categoría */}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <button
+                          onClick={() => setCalendarFilter("all")}
+                          className={`px-2.5 py-1 rounded-md transition border ${calendarFilter === "all" ? "bg-white/20 border-white/30 text-white font-semibold" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}
+                        >
+                          Todos
+                        </button>
+                        <button
+                          onClick={() => setCalendarFilter("experience")}
+                          className={`px-2.5 py-1 rounded-md transition flex items-center gap-1.5 border ${calendarFilter === "experience" ? "bg-[#007AFF]/30 border-[#007AFF] text-white font-semibold" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#007AFF]" />
+                          Experiencia
+                        </button>
+                        <button
+                          onClick={() => setCalendarFilter("education")}
+                          className={`px-2.5 py-1 rounded-md transition flex items-center gap-1.5 border ${calendarFilter === "education" ? "bg-[#FF9500]/30 border-[#FF9500] text-white font-semibold" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#FF9500]" />
+                          Estudios
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Timeline Vertical Interactivo */}
+                    <div className="relative pl-6 border-l-2 border-white/10 space-y-6">
+                      {calendarEvents
+                        .filter(ev => calendarFilter === "all" || ev.category === calendarFilter)
+                        .sort((a, b) => a.year - b.year)
+                        .map(ev => {
+                          const isSelected = selectedCalendarEvent?.id === ev.id;
+
+                          return (
+                            <div
+                              key={ev.id}
+                              onClick={() => {
+                                setSelectedCalendarEvent(ev);
+                                setCalendarYear(ev.year);
+                                setCalendarMonth(ev.month);
+                              }}
+                              className={`relative group cursor-pointer p-4.5 rounded-2xl border transition-all ${
+                                isSelected
+                                  ? "bg-white/15 border-white/30 shadow-xl scale-[1.01]"
+                                  : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                              }`}
+                            >
+                              {/* Nodo del timeline */}
+                              <div
+                                className={`absolute -left-[31px] top-6 w-4 h-4 rounded-full border-2 border-[#1e222d] shadow-md transition transform group-hover:scale-125 ${
+                                  isSelected ? "ring-2 ring-white" : ""
+                                }`}
+                                style={{ backgroundColor: ev.color }}
+                              />
+
+                              <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center gap-2.5">
+                                    {ev.logo ? (
+                                      <div className="w-6 h-6 rounded-full overflow-hidden border border-white/20 bg-white/10 shadow-sm shrink-0">
+                                        <img src={ev.logo} alt={ev.institution} className="w-full h-full object-cover" />
+                                      </div>
+                                    ) : null}
+                                    <span
+                                      className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm"
+                                      style={{ backgroundColor: ev.color }}
+                                    >
+                                      {ev.category === "experience" ? "Experiencia Laboral" : ev.category === "education" ? "Estudios & Formación" : "Hito"}
+                                    </span>
+                                    <span className="text-xs font-bold text-white/90">{ev.period}</span>
+                                  </div>
+                                  <span className="text-[11px] font-mono text-white/40">Año {ev.year}</span>
+                                </div>
+
+                                <div>
+                                  <h3 className="text-base font-bold text-white group-hover:text-white/90">
+                                    {ev.title}
+                                  </h3>
+                                  <div className="text-xs text-white/80 font-medium mt-0.5">
+                                    🏛️ {ev.institution} &nbsp;•&nbsp; <span className="text-white/50">📍 {ev.location}</span>
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-white/70 leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5 mt-1">
+                                  {ev.description}
+                                </p>
+
+                                <div className="flex flex-wrap gap-1.5 mt-1">
+                                  {ev.skills.map((skill, sIdx) => (
+                                    <span
+                                      key={sIdx}
+                                      className="px-2 py-0.5 rounded bg-white/10 border border-white/10 text-[10.5px] font-mono text-white/85"
+                                    >
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : calendarViewMode === "year" ? (
+                  /* ==================== VISTA AÑO: GRID DE 12 MESES (EXACTO A APPLE) ==================== */
+                  <div className="grid grid-cols-4 gap-x-8 gap-y-6 pt-1">
+                    {[
+                      { name: "Enero", index: 0, days: 31, offset: 3, prevDays: [29, 30, 31] },
+                      { name: "Febrero", index: 1, days: (calendarYear % 4 === 0 ? 29 : 28), offset: 6, prevDays: [26, 27, 28, 29, 30, 31] },
+                      { name: "Marzo", index: 2, days: 31, offset: 6, prevDays: [23, 24, 25, 26, 27, 28] },
+                      { name: "Abril", index: 3, days: 30, offset: 2, prevDays: [30, 31] },
+                      { name: "Mayo", index: 4, days: 31, offset: 4, prevDays: [27, 28, 29, 30] },
+                      { name: "Junio", index: 5, days: 30, offset: 0, prevDays: [] },
+                      { name: "Julio", index: 6, days: 31, offset: 2, prevDays: [29, 30] },
+                      { name: "Agosto", index: 7, days: 31, offset: 5, prevDays: [27, 28, 29, 30, 31] },
+                      { name: "Septiembre", index: 8, days: 30, offset: 1, prevDays: [31] },
+                      { name: "Octubre", index: 9, days: 31, offset: 3, prevDays: [28, 29, 30] },
+                      { name: "Noviembre", index: 10, days: 30, offset: 6, prevDays: [26, 27, 28, 29, 30] },
+                      { name: "Diciembre", index: 11, days: 31, offset: 1, prevDays: [30] },
+                    ].map((m) => {
+                      return (
+                        <div
+                          key={m.name}
+                          onClick={() => {
+                            setCalendarMonth(m.index);
+                            setCalendarViewMode("month");
+                          }}
+                          className="flex flex-col group cursor-pointer hover:bg-white/[0.03] p-2 rounded-xl transition"
+                        >
+                          {/* Título de Mes en Rojo Apple */}
+                          <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-[#FF3B30] text-[15px] font-medium tracking-tight group-hover:underline">
+                              {m.name}
+                            </h2>
+                            {calendarEvents.some(ev => ev.year === calendarYear && ev.month === m.index) && (
+                              <span className="w-2 h-2 rounded-full bg-[#007AFF] shadow-sm animate-pulse" title="Hay eventos este mes" />
+                            )}
+                          </div>
+
+                          {/* Días de la semana (L M X J V S D) */}
+                          <div className="grid grid-cols-7 text-[10px] font-medium text-white/40 text-center mb-1">
+                            <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                          </div>
+
+                          {/* Cuadrícula de Días */}
+                          <div className="grid grid-cols-7 text-[11px] font-medium text-center gap-y-1">
+                            {/* Días previos en gris tenue */}
+                            {m.prevDays.map((pd, pidx) => (
+                              <span key={`p-${pidx}`} className="text-white/20">
+                                {pd}
+                              </span>
+                            ))}
+
+                            {/* Días del mes actual */}
+                            {Array.from({ length: m.days }, (_, i) => i + 1).map((day) => {
+                              // Eventos en este día, mes y año activo
+                              const event = calendarEvents.find(ev => ev.year === calendarYear && ev.month === m.index && ev.day === day);
+                              const isToday = calendarYear === 2026 && m.index === 7 && day === 20;
+
+                              return (
+                                <div
+                                  key={`d-${day}`}
+                                  onClick={(e) => {
+                                    if (event) {
+                                      e.stopPropagation();
+                                      setSelectedCalendarEvent(event);
+                                    }
+                                  }}
+                                  className="relative flex items-center justify-center h-[22px]"
+                                >
+                                  {isToday || event ? (
+                                    <span
+                                      className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10.5px] text-white shadow-sm transition transform hover:scale-110 ${
+                                        isToday ? "bg-[#FF3B30]" : ""
+                                      }`}
+                                      style={!isToday && event ? { backgroundColor: event.color } : {}}
+                                      title={event ? `${event.title} (${event.institution})` : "Hoy"}
+                                    >
+                                      {day}
+                                    </span>
+                                  ) : (
+                                    <span className="text-white/85 hover:text-white">
+                                      {day}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* ==================== VISTA MES / DETALLE ==================== */
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setCalendarViewMode("year")}
+                        className="text-xs font-semibold text-[#007AFF] hover:underline flex items-center gap-1"
+                      >
+                        ‹ Volver al Año {calendarYear}
+                      </button>
+                      <div className="flex gap-2 text-xs">
+                        <span className="flex items-center gap-1.5 text-white/70">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#007AFF]" /> Experiencia Laboral
+                        </span>
+                        <span className="flex items-center gap-1.5 text-white/70">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" /> Estudios & Formación
+                        </span>
+                        <span className="flex items-center gap-1.5 text-white/70">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#34C759]" /> Hito
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-7 text-xs font-bold text-white/40 text-center pb-2 border-b border-white/10">
+                      <span>LUNES</span><span>MARTES</span><span>MIÉRCOLES</span><span>JUEVES</span><span>VIERNES</span><span>SÁBADO</span><span>DOMINGO</span>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                        const event = calendarEvents.find(ev => ev.year === calendarYear && ev.month === calendarMonth && ev.day === day);
+                        const isToday = calendarYear === 2026 && calendarMonth === 7 && day === 20;
+
+                        return (
+                          <div
+                            key={day}
+                            onClick={() => event && setSelectedCalendarEvent(event)}
+                            className={`min-h-[85px] p-2 rounded-xl border flex flex-col justify-between transition cursor-pointer ${
+                              isToday
+                                ? "bg-white/10 border-white/30"
+                                : event
+                                ? "bg-white/5 border-white/15 hover:bg-white/10"
+                                : "border-white/5 hover:bg-white/[0.02]"
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className={`text-xs font-semibold ${isToday ? "w-6 h-6 rounded-full bg-[#FF3B30] text-white flex items-center justify-center font-bold" : "text-white/80"}`}>
+                                {day}
+                              </span>
+                              {event && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded-full uppercase font-bold text-white shadow-sm" style={{ backgroundColor: event.color }}>
+                                  {event.category}
+                                </span>
+                              )}
+                            </div>
+                            {event && (
+                              <div className="mt-1 p-1.5 rounded-lg bg-black/30 border border-white/5">
+                                <div className="text-[10.5px] font-bold text-white truncate">{event.title}</div>
+                                <div className="text-[9px] text-white/60 truncate">{event.institution}</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal / Inspector Flotante al seleccionar un Evento de Experiencia o Estudios */}
+              {selectedCalendarEvent && (
+                <div className="border-t border-white/10 bg-[#161820]/95 p-4 px-8 flex items-center justify-between gap-6 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-lg text-white shadow-md shrink-0 mt-0.5 overflow-hidden border border-white/15 bg-white/10"
+                      style={!selectedCalendarEvent.logo ? { backgroundColor: selectedCalendarEvent.color } : {}}
+                    >
+                      {selectedCalendarEvent.logo ? (
+                        <img src={selectedCalendarEvent.logo} alt={selectedCalendarEvent.institution} className="w-full h-full object-cover" />
+                      ) : (
+                        selectedCalendarEvent.category === "experience" ? "💼" : selectedCalendarEvent.category === "education" ? "🎓" : "🚀"
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-sm font-bold text-white">{selectedCalendarEvent.title}</h3>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/70 font-mono">
+                          {selectedCalendarEvent.period}
+                        </span>
+                      </div>
+                      <div className="text-xs text-white/80 font-medium mt-0.5">
+                        {selectedCalendarEvent.institution} • <span className="text-white/50">{selectedCalendarEvent.location}</span>
+                      </div>
+                      <p className="text-xs text-white/65 mt-1 leading-relaxed max-w-4xl">
+                        {selectedCalendarEvent.description}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {selectedCalendarEvent.skills.map((skill, sIdx) => (
+                          <span key={sIdx} className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] font-mono text-white/80">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedCalendarEvent(null)}
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/60 hover:text-white text-xs font-bold transition shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </Rnd>
+        )}
       </div>
       {/* ==================== CHIPS DE VENTANAS MINIMIZADAS (libres por toda la pantalla) ==================== */}
       {(Object.keys(openWindows) as string[]).map((appId) => {
@@ -2594,9 +3721,11 @@ y las experiencias interactivas.`);
 
         const labels: Record<string, string> = {
           finder: "Mi CV",
+          acrobat: "Acrobat",
           notes: "Notas",
           terminal: "Terminal",
           chrome: "Chrome",
+          calendar: "Calendario",
         };
 
         return (
@@ -2717,6 +3846,31 @@ y las experiencias interactivas.`);
             )}
           </motion.div>
 
+          {/* Calendar Icon (Exacto a Apple Calendar: Cabecera Roja 'Jue' + Número '20') */}
+          <motion.div
+            onClick={() => openApp("calendar")}
+            whileHover={{ scale: 1.25, y: -10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            className="flex flex-col items-center gap-0.5 relative group"
+          >
+            <div className="w-[52px] h-[52px] bg-white rounded-[13px] flex flex-col items-center justify-between pt-1.5 pb-1 cursor-pointer shadow-[0_8px_16px_rgba(0,0,0,0.28)] border border-black/5 overflow-hidden font-sans select-none">
+              {/* Día en Rojo Apple (ej. 'Jue') */}
+              <span className="text-[#FF3B30] text-[11px] font-bold tracking-tight leading-none">
+                {dayOfWeekShort}
+              </span>
+              {/* Número del Día en Negro Oscuro Apple (ej. '20') */}
+              <span className="text-[27px] font-[350] text-[#1D1D1F] tracking-tight leading-none mb-0.5 font-sans">
+                {dayNumber}
+              </span>
+            </div>
+            <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
+              Calendario
+            </span>
+            {openWindows.calendar?.isOpen && (
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+            )}
+          </motion.div>
+
           {/* Notes Icon */}
           <motion.div
             onClick={() => openApp("notes")}
@@ -2755,149 +3909,6 @@ y las experiencias interactivas.`);
 
         </div>
       </div>
-
-      {/* 5. CENTRO DE CONTROL LIQUID GLASS (MacBook Neo Exact Layout) */}
-      {isControlCenterOpen && (
-        <div className="absolute top-[34px] right-[10px] z-[9999999]">
-          <LiquidGlass
-            cornerRadius={28}
-            displacementScale={30}
-            blurAmount={0.08}
-            saturation={130}
-            elasticity={0.25}
-          >
-            <div className="w-[330px] p-4.5 text-white flex flex-col gap-3.5 text-[12px] font-sans select-none">
-
-              {/* Fila Superior: Pills de Conexión (izq) y Widget Música (der) */}
-              <div className="grid grid-cols-2 gap-3.5">
-
-                {/* Pills de Conexión (Wi-Fi, Bluetooth, AirDrop) */}
-                <div className="bg-white/10 border border-white/15 rounded-[22px] p-3 flex flex-col gap-2.5 justify-center shadow-sm">
-                  {/* Wi-Fi */}
-                  <div onClick={() => setWifi(!wifi)} className="flex items-center gap-2.5 cursor-pointer">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition ${wifi ? "bg-[#008FFE] text-white" : "bg-white/10 text-white/60"}`}>
-                      📶
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-[10.5px] leading-tight">Wi-Fi</span>
-                      <span className="text-[9px] text-white/50 leading-none mt-0.5 truncate max-w-[80px]">{wifi ? "HITRON-E050" : "Desactivado"}</span>
-                    </div>
-                  </div>
-
-                  {/* Bluetooth */}
-                  <div onClick={() => setBluetooth(!bluetooth)} className="flex items-center gap-2.5 cursor-pointer">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition ${bluetooth ? "bg-[#008FFE] text-white" : "bg-white/10 text-white/60"}`}>
-                      ᛒ
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-[10.5px] leading-tight">Bluetooth</span>
-                      <span className="text-[9px] text-white/50 leading-none mt-0.5">{bluetooth ? "Activado" : "Desactivado"}</span>
-                    </div>
-                  </div>
-
-                  {/* AirDrop */}
-                  <div className="flex items-center gap-2.5 cursor-pointer">
-                    <div className="w-7 h-7 rounded-full bg-white/10 text-white/60 flex items-center justify-center text-[10px]">
-                      🌀
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-[10.5px] leading-tight">AirDrop</span>
-                      <span className="text-[9px] text-white/50 leading-none mt-0.5">Desactivado</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Columna Derecha: Música + Botones redondos */}
-                <div className="flex flex-col gap-3.5">
-                  {/* Widget Música */}
-                  <div className="bg-white/10 border border-white/15 rounded-[22px] p-3 flex flex-col gap-2 flex-1 justify-between shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-xs shadow-inner">
-                        🎵
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[10px] text-white/80 leading-tight">Sin contenido</span>
-                        <span className="text-[8.5px] text-white/40 leading-none mt-0.5">Música</span>
-                      </div>
-                    </div>
-                    {/* Controles de reproducción */}
-                    <div className="flex justify-center gap-4 text-[13px] text-white/65 mt-1 pb-1">
-                      <button className="hover:text-white cursor-pointer transition">⏮</button>
-                      <button className="hover:text-white cursor-pointer text-[14px] transition">▶</button>
-                      <button className="hover:text-white cursor-pointer transition">⏭</button>
-                    </div>
-                  </div>
-
-                  {/* Botones redondos chicos (Focus / Mirroring) */}
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div className="h-9 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center cursor-pointer text-[14px] border border-white/15 transition shadow-sm">
-                      🔲
-                    </div>
-                    <div className="h-9 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center cursor-pointer text-[14px] border border-white/15 transition shadow-sm">
-                      🔘
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Fila Media: Modo Oscuro, Captura y Modos (Luna) */}
-              <div className="grid grid-cols-3 gap-3.5">
-                {/* Dark Mode */}
-                <div className="h-10 rounded-full bg-white flex items-center justify-center cursor-pointer text-black text-lg transition shadow-md hover:bg-white/95">
-                  ◐
-                </div>
-                {/* Screen Capture */}
-                <div className="h-10 rounded-full bg-white/10 border border-white/15 flex items-center justify-center cursor-pointer text-base text-white transition hover:bg-white/15">
-                  📸
-                </div>
-                {/* Modos Wide Pill */}
-                <div className="h-10 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-start gap-2 px-3.5 cursor-pointer border border-white/15 transition shadow-sm">
-                  <span className="text-sm">🌙</span>
-                  <span className="font-semibold text-[10.5px]">Modos</span>
-                </div>
-              </div>
-
-              {/* Deslizadores de Pantalla y Sonido */}
-              <div className="flex flex-col gap-3.5">
-                {/* Pantalla (Brightness) */}
-                <div className="bg-white/10 border border-white/15 rounded-[22px] p-3.5 flex flex-col gap-2 shadow-sm">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider pl-1 font-sans">Pantalla</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] text-white/60">🔅</span>
-                    <input
-                      type="range" min="10" max="100" value={brightness}
-                      onChange={(e) => setBrightness(Number(e.target.value))}
-                      className="liquid-slider"
-                    />
-                    <span className="text-[12px] text-white/60">🔆</span>
-                  </div>
-                </div>
-
-                {/* Sonido (Volume) */}
-                <div className="bg-white/10 border border-white/15 rounded-[22px] p-3.5 flex flex-col gap-2 shadow-sm">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider pl-1 font-sans">Sonido</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] text-white/60">🔈</span>
-                    <input
-                      type="range" min="0" max="100" value={volume}
-                      onChange={(e) => setVolume(Number(e.target.value))}
-                      className="liquid-slider"
-                    />
-                    <span className="text-[12px] text-white/60">🔊</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botón inferior Editar Controles */}
-              <button className="w-full py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-semibold text-white/80 cursor-pointer transition">
-                Editar controles
-              </button>
-
-            </div>
-          </LiquidGlass>
-        </div>
-      )}
 
     </div>
   );
