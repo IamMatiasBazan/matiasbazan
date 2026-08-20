@@ -1211,7 +1211,7 @@ y las experiencias interactivas.`);
 
   return (
     <div
-      className="relative w-full h-full min-h-screen overflow-hidden select-none bg-[#0d1117] text-white transition-[filter] duration-150"
+      className="fixed inset-0 w-full h-full h-[100dvh] max-h-[100dvh] overflow-hidden select-none bg-[#0d1117] text-white transition-[filter] duration-150"
       style={{ filter: `brightness(${brightness}%)` }}
     >
 
