@@ -781,11 +781,60 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
     }));
   };
 
+  // Push history state to intercept Android / Mobile physical Back button (◀)
+  const pushMobileHistory = (type: string, id?: string) => {
+    if (typeof window !== "undefined") {
+      try {
+        window.history.pushState({ modalType: type, id, timestamp: Date.now() }, "");
+      } catch (err) {
+        // ignore
+      }
+    }
+  };
+
+  // Intercept Mobile / Android Physical Back Button (Volver Atrás)
+  useEffect(() => {
+    const handlePopState = () => {
+      // 1. If Tab Switcher inside Chrome mobile is open, close it first
+      if (isMobileTabSwitcherOpen) {
+        setIsMobileTabSwitcherOpen(false);
+        return;
+      }
+
+      // 2. If Control Center is open, close it
+      if (isControlCenterOpen) {
+        setIsControlCenterOpen(false);
+        return;
+      }
+
+      // 3. If Menus (Apple, WiFi, Bluetooth) are open, close them
+      if (isAppleMenuOpen || isWifiMenuOpen || isBluetoothMenuOpen) {
+        setIsAppleMenuOpen(false);
+        setIsWifiMenuOpen(false);
+        setIsBluetoothMenuOpen(false);
+        return;
+      }
+
+      // 4. If any App window is open on mobile, close the active / topmost app and return to Desktop
+      const openKeys = (Object.keys(openWindows) as string[]).filter(k => openWindows[k].isOpen);
+      if (openKeys.length > 0) {
+        const topApp = openKeys.reduce((a, b) => openWindows[a].zIndex >= openWindows[b].zIndex ? a : b);
+        closeApp(topApp);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isMobileTabSwitcherOpen, isControlCenterOpen, isAppleMenuOpen, isWifiMenuOpen, isBluetoothMenuOpen, openWindows]);
+
   // Open Window Action
   const openApp = (appId: string) => {
     const nextZIndex = maxZIndex + 1;
     setMaxZIndex(nextZIndex);
     setActiveWindow(appId);
+    if (isMobile) {
+      pushMobileHistory("app", appId);
+    }
     setOpenWindows(prev => {
       let position = prev[appId].position;
 
@@ -815,6 +864,9 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
   // Close Window Action
   const closeApp = (appId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (appId === "chrome") {
+      setIsMobileTabSwitcherOpen(false);
+    }
     setOpenWindows(prev => ({
       ...prev,
       [appId]: {
@@ -3629,21 +3681,38 @@ y las experiencias interactivas.`);
 
               {/* iOS Bottom Toolbar & Home Indicator en Mobile */}
               {isMobile ? (
-                <div className="ios-nav-blur border-t border-black/10 flex flex-col shrink-0 select-none z-20 bg-[#f6f6f6]/95 text-black">
-                  <div className="h-[44px] flex items-center justify-around px-4 text-[#007AFF]">
+                <div className="ios-nav-blur border-t border-black/10 flex flex-col shrink-0 select-none z-20 bg-[#f6f6f6]/95 text-black pb-[max(6px,env(safe-area-inset-bottom,6px))]">
+                  <div className="h-[46px] flex items-center justify-around px-2 text-[#007AFF]">
+                    {/* Botón Atrás / Salir */}
                     <button
                       type="button"
                       onClick={() => {
-                        // Go home / newtab
+                        if (chromeUrl && chromeUrl !== "chrome://newtab") {
+                          setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: "chrome://newtab", title: "Nueva pestaña" } : t));
+                          setChromeInputUrl("chrome://newtab");
+                        } else {
+                          closeApp("chrome");
+                        }
+                      }}
+                      className="p-2 active:opacity-60 transition cursor-pointer flex items-center justify-center"
+                      title="Atrás / Inicio"
+                    >
+                      <ChevronLeft className="w-5 h-5 stroke-[2.4]" />
+                    </button>
+                    {/* Botón Home */}
+                    <button
+                      type="button"
+                      onClick={() => {
                         setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: "chrome://newtab", title: "Nueva pestaña" } : t));
                         setChromeInputUrl("chrome://newtab");
                         setIsMobileTabSwitcherOpen(false);
                       }}
                       className="p-2 active:opacity-60 transition text-lg cursor-pointer"
-                      title="Inicio"
+                      title="Nueva Pestaña"
                     >
                       <HomeIcon className="w-5 h-5 stroke-[2]" />
                     </button>
+                    {/* Botón Recargar */}
                     <button
                       type="button"
                       onClick={() => {
@@ -3660,6 +3729,7 @@ y las experiencias interactivas.`);
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                       </svg>
                     </button>
+                    {/* Botón Nueva Pestaña */}
                     <button
                       type="button"
                       onClick={() => {
@@ -3674,9 +3744,14 @@ y las experiencias interactivas.`);
                     >
                       +
                     </button>
+                    {/* Botón Contador / Switcher de Pestañas */}
                     <button
                       type="button"
-                      onClick={() => setIsMobileTabSwitcherOpen(prev => !prev)}
+                      onClick={() => {
+                        const nextState = !isMobileTabSwitcherOpen;
+                        setIsMobileTabSwitcherOpen(nextState);
+                        if (nextState) pushMobileHistory("switcher");
+                      }}
                       className={`w-6 h-6 rounded-md border text-[11px] font-bold flex items-center justify-center cursor-pointer active:scale-95 transition ${
                         isMobileTabSwitcherOpen ? "bg-[#007AFF] text-white border-[#007AFF]" : "border-[#007AFF] text-[#007AFF]"
                       }`}
@@ -3688,7 +3763,8 @@ y las experiencias interactivas.`);
                   {/* Home Indicator */}
                   <div
                     onClick={(e) => closeApp("chrome", e)}
-                    className="h-[20px] flex items-center justify-center cursor-pointer active:opacity-60 transition"
+                    className="h-[24px] flex items-center justify-center cursor-pointer active:opacity-60 transition"
+                    title="Cerrar y volver al escritorio"
                   >
                     <div className="w-32 h-1 bg-black/30 rounded-full" />
                   </div>
@@ -4430,7 +4506,7 @@ y las experiencias interactivas.`);
       <div
         onMouseEnter={() => setShowDockFullscreen(true)}
         onMouseLeave={() => setShowDockFullscreen(false)}
-        className={`absolute bottom-[20px] left-[50%] -translate-x-1/2 z-[9999] select-none transition-all duration-300 ease-out ${(isMobile && isAnyAppOpen) || (isAnyAppMaximized && !showDockFullscreen)
+        className={`absolute bottom-[max(16px,env(safe-area-inset-bottom,16px))] left-[50%] -translate-x-1/2 z-[9999] select-none transition-all duration-300 ease-out ${(isMobile && isAnyAppOpen) || (isAnyAppMaximized && !showDockFullscreen)
           ? "translate-y-[150%] opacity-0 pointer-events-none"
           : "translate-y-0 opacity-100"
           }`}
