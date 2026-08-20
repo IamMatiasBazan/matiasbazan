@@ -84,29 +84,35 @@ body {
 }
 
 .btn-portfolio {
-  background-color: #008FFE;
+  background: linear-gradient(135deg, #008FFE 0%, #0077D6 100%);
   color: #ffffff;
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  padding: 14px 44px; /* Más ancho al aumentar padding horizontal */
+  padding: 13px 32px;
   border-radius: 50px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  box-shadow: 0 4px 0 #005DA6; /* Sombra sólida de 4px en Y, sin blur, color #005DA6 */
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 0 #005DA6, 0 8px 24px rgba(0, 143, 254, 0.28);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 
 .btn-portfolio:hover {
   transform: translateY(-2px);
-  background-color: #008FFE;
-  box-shadow: 0 6px 0 #005DA6; /* Sombra más alta al elevar el botón */
+  background: linear-gradient(135deg, #1aa0ff 0%, #008FFE 100%);
+  box-shadow: 0 6px 0 #005DA6, 0 12px 28px rgba(0, 143, 254, 0.4);
 }
 
 .btn-portfolio:active {
-  transform: translateY(4px);
-  box-shadow: 0 0 0 #005DA6; /* Sombra presionada al hacer click */
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #005DA6, 0 4px 12px rgba(0, 143, 254, 0.2);
 }
 
 /* Hero Content Area */
@@ -357,39 +363,186 @@ body {
 /* Media Queries para Responsividad */
 @media (max-width: 768px) {
   .header {
-    height: 80px;
+    height: 68px;
+    padding: 0 18px;
   }
 
   .logo {
-    height: 36px;
+    height: 30px;
   }
 
   .btn-portfolio {
     padding: 10px 20px;
-    font-size: 14px;
+    font-size: 13.5px;
+    box-shadow: 0 3px 0 #005DA6, 0 6px 18px rgba(0, 143, 254, 0.25);
   }
 
   .bg-text-left {
     right: 50%;
-    transform: translateX(-5%);
-    font-size: min(12vw, 70px);
+    transform: translateX(-4%);
+    font-size: clamp(36px, 10vw, 64px);
+    letter-spacing: -1px;
+    top: 22%;
   }
 
   .bg-text-right {
     left: 50%;
-    transform: translateX(5%);
+    transform: translateX(4%);
+    top: 22%;
   }
 
   .bg-text-right h2 {
-    font-size: min(12vw, 70px);
+    font-size: clamp(36px, 10vw, 64px);
+    letter-spacing: -1px;
   }
 
   .bg-text-right h3 {
-    font-size: min(9.5vw, 55px);
+    font-size: clamp(26px, 7.5vw, 48px);
+    letter-spacing: -1px;
   }
 
-  .person-img {
-    height: 65%;
+  .person-frame {
+    height: 68vh;
+  }
+
+  .projects-img {
+    height: 54vh;
+    max-width: 92vw;
+  }
+
+  .macos-dock {
+    bottom: 16px;
+  }
+
+  .dock-container {
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 20px;
+  }
+
+  .dock-item {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+
+  .dock-icon {
+    border-radius: 11px;
+  }
+}
+
+/* Teléfonos y pantallas móviles (iPhone, Android) */
+@media (max-width: 480px) {
+  .header {
+    height: 58px;
+    padding: 0 12px;
+  }
+
+  .logo {
+    height: 25px;
+  }
+
+  .btn-portfolio {
+    padding: 8px 14px;
+    font-size: 12px;
+    border-radius: 30px;
+    box-shadow: 0 3px 0 #005DA6, 0 4px 14px rgba(0, 143, 254, 0.25);
+  }
+
+  .bg-text-left {
+    right: 50%;
+    transform: translateX(-3%);
+    font-size: clamp(26px, 9.5vw, 46px);
+    letter-spacing: -0.5px;
+    top: 18%;
+  }
+
+  .bg-text-right {
+    left: 50%;
+    transform: translateX(3%);
+    top: 18%;
+  }
+
+  .bg-text-right h2 {
+    font-size: clamp(26px, 9.5vw, 46px);
+    letter-spacing: -0.5px;
+  }
+
+  .bg-text-right h3 {
+    font-size: clamp(20px, 7vw, 36px);
+    letter-spacing: -0.5px;
+    margin-top: 4px;
+  }
+
+  .person-frame {
+    height: 58vh;
+    max-height: 480px;
+  }
+
+  .projects-img {
+    height: 46vh;
+    max-height: 380px;
+    max-width: 95vw;
+  }
+
+  .macos-dock {
+    bottom: 12px;
+    max-width: 96vw;
+  }
+
+  .dock-container {
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 16px;
+  }
+
+  .dock-item {
+    width: 35px;
+    height: 35px;
+    border-radius: 9px;
+    flex-shrink: 0;
+  }
+
+  .dock-icon {
+    border-radius: 9px;
+  }
+
+  .dock-tooltip {
+    display: none; /* ocultar tooltips en pantallas táctiles móviles */
+  }
+}
+
+/* Pantallas extra pequeñas (<360px) */
+@media (max-width: 360px) {
+  .header {
+    height: 52px;
+    padding: 0 8px;
+  }
+
+  .logo {
+    height: 22px;
+  }
+
+  .btn-portfolio {
+    padding: 7px 10px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .dock-container {
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 14px;
+  }
+
+  .dock-item {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+  }
+
+  .dock-icon {
+    border-radius: 7px;
   }
 }
 

@@ -29,7 +29,16 @@ import {
   SlidersHorizontal,
   File,
   FileText,
-  FileDown
+  FileDown,
+  Sun,
+  SunMedium,
+  SunDim,
+  Volume,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Wifi,
+  Bluetooth
 } from "lucide-react";
 
 const LiquidGlass = dynamic(() => import("liquid-glass-react"), { ssr: false });
@@ -84,6 +93,9 @@ interface WindowsMap {
 }
 
 export default function Home() {
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+
   // Clock state
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
@@ -96,8 +108,7 @@ export default function Home() {
   const [isWifiMenuOpen, setIsWifiMenuOpen] = useState(false);
   const [isBluetoothMenuOpen, setIsBluetoothMenuOpen] = useState(false);
 
-  // OS Audio & Connectivity levels (Datos reales del Mac)
-  const [volume, setVolume] = useState(80);
+  // OS Screen & Connectivity levels (Datos reales del Mac)
   const [brightness, setBrightness] = useState(90);
   const [wifi, setWifi] = useState(true);
   const [selectedWifiSsid, setSelectedWifiSsid] = useState("HITRON-E050");
@@ -118,26 +129,6 @@ export default function Home() {
   ]);
 
   const connectedBtCount = bluetooth ? bluetoothDevices.filter(d => d.connected).length : 0;
-
-  // Feedback sonoro nativo estilo macOS al ajustar volumen
-  const playVolumeFeedback = (level: number) => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = "sine";
-      osc.frequency.value = 880; // A5 note
-      const gainVal = Math.max(0.005, (level / 100) * 0.12);
-      gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
-    } catch (e) {
-      // Ignorar si el navegador bloquea audio
-    }
-  };
 
   // Focus tracking state
   const [maxZIndex, setMaxZIndex] = useState(10);
@@ -163,6 +154,7 @@ export default function Home() {
   const activeTab = chromeTabs.find(t => t.id === activeTabId) || chromeTabs[0];
   const chromeUrl = activeTab ? activeTab.url : "chrome://newtab";
   const [chromeInputUrl, setChromeInputUrl] = useState("chrome://newtab");
+  const [isMobileTabSwitcherOpen, setIsMobileTabSwitcherOpen] = useState(false);
 
   const [showAllShortcuts, setShowAllShortcuts] = useState(false);
   const [showTopBarFullscreen, setShowTopBarFullscreen] = useState(false);
@@ -171,6 +163,9 @@ export default function Home() {
 
   const isAnyAppMaximized = (Object.keys(openWindows) as string[]).some(
     appId => openWindows[appId].isOpen && openWindows[appId].isMaximized && !openWindows[appId].isMinimized
+  );
+  const isAnyAppOpen = (Object.keys(openWindows) as string[]).some(
+    appId => openWindows[appId].isOpen && !openWindows[appId].isMinimized
   );
   const initialFS: Record<string, Record<string, string | null>> = {
     "~": { "Documents": null, "Desktop": null },
@@ -332,6 +327,7 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
   const [activeNoteId, setActiveNoteId] = useState<string>("about");
   const [notesSearch, setNotesSearch] = useState("");
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
+  const [mobileNotesView, setMobileNotesView] = useState<"list" | "note">("list");
 
   // Calendar App State (Apple Calendar Design with Events: Studies & Experience)
   interface CalendarEvent {
@@ -630,6 +626,14 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
     }
   };
 
+  // Mobile detection effect
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Battery Status API & Dynamic Initial Position tracking effect
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -679,6 +683,8 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
 
           batt.addEventListener("levelchange", levelChange);
           batt.addEventListener("chargingchange", chargingChange);
+        }).catch(() => {
+          // Ignorar si el navegador restringe la API de batería
         });
       }
 
@@ -686,6 +692,43 @@ Desarrollo, optimización y mantenimiento de la plataforma web. Un sistema real 
         window.removeEventListener("message", handleMessage);
       };
     }
+  }, []);
+
+  // Gesture listener: Swipe down from top on mobile to open Control Center (Brillo y Volumen)
+  useEffect(() => {
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const touchEndY = e.changedTouches[0].clientY;
+      const touchEndX = e.changedTouches[0].clientX;
+      const diffY = touchEndY - touchStartY;
+      const diffX = Math.abs(touchEndX - touchStartX);
+
+      // If swipe started in top 120px of screen and dragged down > 40px
+      if (touchStartY < 120 && diffY > 40 && diffY > diffX) {
+        setIsControlCenterOpen(true);
+        setIsAppleMenuOpen(false);
+      }
+      
+      // If control center is open and user swipes up, close it
+      if (diffY < -40 && diffY < -diffX) {
+        setIsControlCenterOpen(false);
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
   }, []);
 
   // Clock Update Effect
@@ -1138,12 +1181,12 @@ y las experiencias interactivas.`);
       <div
         onMouseEnter={() => setShowTopBarFullscreen(true)}
         onMouseLeave={() => setShowTopBarFullscreen(false)}
-        className={`absolute top-0 left-0 w-full h-[28px] bg-[#000000]/75 backdrop-blur-2xl flex items-center justify-between px-4 text-[13px] font-normal z-[999999] shadow-sm select-none text-white/90 border-b border-black/45 transition-transform duration-300 ease-out ${isAnyAppMaximized && !showTopBarFullscreen ? "-translate-y-full" : "translate-y-0"
+        className={`absolute top-0 left-0 w-full h-[28px] bg-[#000000]/75 backdrop-blur-2xl flex items-center justify-between px-3 text-[13px] font-normal z-[999999] shadow-sm select-none text-white/90 border-b border-black/45 transition-all duration-300 ease-out ${(isMobile && isAnyAppOpen) || (isAnyAppMaximized && !showTopBarFullscreen) ? "-translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           }`}
       >
 
         {/* Lado Izquierdo: Menú Apple + Apps */}
-        <div className="flex items-center gap-3 relative">
+        <div className="flex items-center gap-2 relative">
 
           {/* Manzana Apple */}
           <div className="relative">
@@ -1151,7 +1194,7 @@ y las experiencias interactivas.`);
               onClick={() => { setIsAppleMenuOpen(!isAppleMenuOpen); setIsControlCenterOpen(false); }}
               className="cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded transition-all duration-150 text-[15px] font-bold text-white"
             >
-              
+              
             </span>
             {isAppleMenuOpen && (
               <div className="absolute top-7 left-0 z-[9999999] bg-[#1a1c23]/85 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl w-52 p-1.5 text-white/95 flex flex-col font-sans">
@@ -1163,14 +1206,16 @@ y las experiencias interactivas.`);
             )}
           </div>
 
-          {/* Nombre de la Aplicación Activa (Negrita) */}
-          <span className="font-bold cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white">
-            {activeWindow === "chrome" ? "Chrome" : activeWindow === "finder" ? "Finder" : activeWindow === "terminal" ? "Terminal" : "Finder"}
-          </span>
+          {/* Nombre de la Aplicación Activa (Negrita) — oculto en mobile */}
+          {!isMobile && (
+            <span className="font-bold cursor-pointer hover:bg-white/15 px-2.5 py-0.5 rounded text-white">
+              {activeWindow === "chrome" ? "Chrome" : activeWindow === "finder" ? "Finder" : activeWindow === "terminal" ? "Terminal" : "Finder"}
+            </span>
+          )}
         </div>
 
         {/* Lado Derecho: Estado, Red, Hora */}
-        <div className="flex items-center gap-3.5 relative">
+        <div className="flex items-center gap-2 relative">
 
           {/* Icono de Wi-Fi */}
           <div className="relative">
@@ -1191,7 +1236,7 @@ y las experiencias interactivas.`);
 
             {/* Dropdown de Wi-Fi Interactivo */}
             {isWifiMenuOpen && (
-              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl w-72 p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+              <div className="fixed top-8 left-2 right-2 sm:left-auto sm:right-0 sm:absolute sm:top-7 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150 sm:w-72 max-w-[calc(100vw-16px)]">
                 <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
                   <div className="flex items-center gap-2.5">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${wifi ? "bg-[#007AFF] text-white" : "bg-white/10 text-white/50"}`}>
@@ -1211,7 +1256,7 @@ y las experiencias interactivas.`);
                 </div>
 
                 {wifi ? (
-                  <div className="pt-2 flex flex-col gap-1.5">
+                  <div className="pt-2 flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto">
                     <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-1">Redes disponibles</div>
                     {availableWifiNetworks.map(net => {
                       const isConnected = selectedWifiSsid === net.ssid;
@@ -1234,7 +1279,7 @@ y las experiencias interactivas.`);
                             {net.locked && (
                               <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white/40"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
                             )}
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M12 20h.01" /></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M1.34 8.89a14 14 0 0 1 21.32 0M12 20h.01" /></svg>
                           </div>
                         </div>
                       );
@@ -1268,7 +1313,7 @@ y las experiencias interactivas.`);
 
             {/* Dropdown de Bluetooth */}
             {isBluetoothMenuOpen && (
-              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl w-72 p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+              <div className="fixed top-8 left-2 right-2 sm:left-auto sm:right-0 sm:absolute sm:top-7 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 text-white flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150 sm:w-72 max-w-[calc(100vw-16px)]">
                 <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
                   <div className="flex items-center gap-2.5">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${bluetooth ? "bg-[#007AFF] text-white" : "bg-white/10 text-white/50"}`}>
@@ -1288,7 +1333,7 @@ y las experiencias interactivas.`);
                 </div>
 
                 {bluetooth ? (
-                  <div className="pt-2 flex flex-col gap-1.5">
+                  <div className="pt-2 flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto">
                     <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-1">Dispositivos conocidos</div>
                     {bluetoothDevices.map(dev => (
                       <div
@@ -1344,23 +1389,22 @@ y las experiencias interactivas.`);
               className={`cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded flex items-center transition-all duration-150 ${isControlCenterOpen ? "bg-white/20" : ""}`}
               title="Centro de Control"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                className="w-[15px] h-[15px]"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18M3 15h18" />
-                <circle cx="8" cy="9" r="1.8" fill="currentColor" />
-                <circle cx="16" cy="15" r="1.8" fill="currentColor" />
-              </svg>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
             </span>
 
-            {/* Dropdown del Centro de Control Completo estilo Apple Sequoia */}
+            {/* Dropdown del Centro de Control Completo estilo Apple Sequoia / iOS */}
             {isControlCenterOpen && (
-              <div className="absolute top-7 right-0 z-[9999999] bg-[#1a1c23]/92 backdrop-blur-3xl border border-white/15 rounded-3xl shadow-2xl w-80 p-3.5 text-white flex flex-col gap-3 font-sans animate-in fade-in zoom-in-95 duration-150 select-none">
+              <div className="fixed top-8 left-2 right-2 sm:left-auto sm:right-0 sm:absolute sm:top-7 z-[9999999] bg-[#1a1c23]/95 backdrop-blur-3xl border border-white/15 rounded-3xl shadow-2xl p-3.5 text-white flex flex-col gap-3 font-sans animate-in fade-in zoom-in-95 duration-150 select-none sm:w-80 max-w-[calc(100vw-16px)]">
                 
+                {/* Pull indicator / handle para deslizar o cerrar en móvil */}
+                {isMobile && (
+                  <div
+                    onClick={() => setIsControlCenterOpen(false)}
+                    className="w-10 h-1 bg-white/30 rounded-full mx-auto -mt-0.5 mb-1 cursor-pointer active:opacity-60 transition"
+                    title="Deslizar arriba para cerrar"
+                  />
+                )}
+
                 {/* Cuadrícula Superior de Conectividad (Wi-Fi y Bluetooth) */}
                 <div className="grid grid-cols-2 gap-2.5">
                   
@@ -1372,7 +1416,7 @@ y las experiencias interactivas.`);
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${wifi ? "bg-white/20" : "bg-white/10"}`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.53 16.11a6 6 0 0 1 6.95 0M4.93 12.5a10 10 0 0 1 14.14 0M1.34 8.89a14 14 0 0 1 21.32 0M12 20h.01" /></svg>
+                      <Wifi className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="text-xs font-bold leading-tight">Wi-Fi</div>
@@ -1388,7 +1432,7 @@ y las experiencias interactivas.`);
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${bluetooth ? "bg-white/20" : "bg-white/10"}`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m7 7 10 10-5 5V2l5 5L7 17" /></svg>
+                      <Bluetooth className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
                       <div className="text-xs font-bold leading-tight">Bluetooth</div>
@@ -1397,47 +1441,26 @@ y las experiencias interactivas.`);
                   </div>
                 </div>
 
-                {/* Control Deslizante de Brillo de Pantalla (Real) */}
-                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col gap-1.5 shadow-inner">
+                {/* Control Deslizante de Brillo de Pantalla con Iconos Lucide */}
+                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col gap-2 shadow-inner">
                   <div className="flex justify-between items-center text-[11px] font-medium text-white/80">
-                    <span className="flex items-center gap-1.5">☀️ Brillo de Pantalla</span>
+                    <span className="flex items-center gap-1.5 font-semibold text-white/90">
+                      <Sun className="w-4 h-4 text-amber-400" />
+                      <span>Brillo de Pantalla</span>
+                    </span>
                     <span className="font-mono text-white/60">{brightness}%</span>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xs text-white/40">🔅</span>
+                    <SunDim className="w-4 h-4 text-white/40 shrink-0" />
                     <input
                       type="range"
                       min="20"
                       max="100"
                       value={brightness}
                       onChange={(e) => setBrightness(Number(e.target.value))}
-                      className="w-full accent-[#007AFF] h-2 bg-white/20 rounded-lg cursor-pointer transition-all"
+                      className="w-full accent-amber-400 h-2 bg-white/20 rounded-lg cursor-pointer transition-all"
                     />
-                    <span className="text-xs text-white/40">🔆</span>
-                  </div>
-                </div>
-
-                {/* Control Deslizante de Sonido / Volumen (Real con Beep) */}
-                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col gap-1.5 shadow-inner">
-                  <div className="flex justify-between items-center text-[11px] font-medium text-white/80">
-                    <span className="flex items-center gap-1.5">🔊 Volumen del Sistema</span>
-                    <span className="font-mono text-white/60">{volume}%</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xs text-white/40">🔈</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={volume}
-                      onChange={(e) => {
-                        const newVol = Number(e.target.value);
-                        setVolume(newVol);
-                        playVolumeFeedback(newVol);
-                      }}
-                      className="w-full accent-[#007AFF] h-2 bg-white/20 rounded-lg cursor-pointer transition-all"
-                    />
-                    <span className="text-xs text-white/40">🔊</span>
+                    <Sun className="w-4 h-4 text-amber-300 shrink-0" />
                   </div>
                 </div>
 
@@ -1446,8 +1469,8 @@ y las experiencias interactivas.`);
           </div>
 
           {/* Fecha y Hora en tiempo real */}
-          <span className="cursor-pointer hover:bg-white/15 px-2 py-0.5 rounded select-none font-normal text-white/95">
-            {currentDate} &nbsp; {currentTime}
+          <span className="cursor-pointer hover:bg-white/15 px-1.5 py-0.5 rounded select-none font-normal text-white/95 text-xs sm:text-[13px]">
+            {isMobile ? currentTime : `${currentDate}  ${currentTime}`}
           </span>
         </div>
       </div>
@@ -1463,8 +1486,8 @@ y las experiencias interactivas.`);
         }}
       />
 
-      {/* 2. COLUMNA DE WIDGETS DE ESCRITORIO (Lado Izquierdo) */}
-      <div className="absolute top-[48px] left-[24px] z-[5] flex flex-col gap-4 select-none pointer-events-auto">
+      {/* 2. COLUMNA DE WIDGETS DE ESCRITORIO (Lado Izquierdo) — ocultar en mobile */}
+      <div className={`absolute top-[48px] left-[24px] z-[5] flex flex-col gap-4 select-none pointer-events-auto ${isMobile ? "hidden" : ""}`}>
 
         {/* Widget 1: Calendario (Abre App Calendario) */}
         <div
@@ -1495,8 +1518,8 @@ y las experiencias interactivas.`);
         </div>
       </div>
 
-      {/* 3. ICONOS DEL ESCRITORIO (Derecha) */}
-      <div className="absolute top-[48px] right-[24px] z-[5] flex flex-col gap-5 items-center select-none text-center">
+      {/* 3. ICONOS DEL ESCRITORIO (Derecha) — ocultar en mobile */}
+      <div className={`absolute top-[48px] right-[24px] z-[5] flex flex-col gap-5 items-center select-none text-center ${isMobile ? "hidden" : ""}`}>
 
         {/* Acrobat PDF (Abre Finder) */}
         <div
@@ -1535,17 +1558,17 @@ y las experiencias interactivas.`);
       </div>
 
       {/* 4. CONTENEDOR MULTI-VENTANAS (Window System con react-rnd) */}
-      <div className="absolute inset-0 z-[10] pointer-events-none select-none">
+      <div className={`absolute inset-0 ${isMobile && isAnyAppOpen ? "z-[999999]" : "z-[10]"} pointer-events-none select-none`}>
 
         {/* ==================== APLICACIÓN: ADOBE ACROBAT (CV) ==================== */}
         {openWindows.acrobat && openWindows.acrobat.isOpen && !openWindows.acrobat.isMinimized && (
           <Rnd
-            size={openWindows.acrobat.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.acrobat.size.width, height: openWindows.acrobat.size.height }}
-            position={openWindows.acrobat.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.acrobat.position.x, y: openWindows.acrobat.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.acrobat.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.acrobat.size.width, height: openWindows.acrobat.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.acrobat.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.acrobat.position.x, y: openWindows.acrobat.position.y }}
             onDragStart={() => setIsDraggingActive(true)}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.acrobat.isMaximized) return;
+              if (openWindows.acrobat.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 acrobat: {
@@ -1555,7 +1578,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.acrobat.isMaximized) return;
+              if (openWindows.acrobat.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 acrobat: {
@@ -1565,10 +1588,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={300}
-            minHeight={200}
-            cancel=".window-control-buttons, input, iframe, button, a"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 300}
+            minHeight={isMobile ? 0 : 200}
+            cancel=".window-control-buttons, input, iframe, button, a, .ios-action-btn"
+            enableResizing={isMobile || openWindows.acrobat.isMaximized ? false : {
               top: !openWindows.acrobat.isMaximized,
               right: !openWindows.acrobat.isMaximized,
               bottom: !openWindows.acrobat.isMaximized,
@@ -1578,7 +1601,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.acrobat.isMaximized,
               topLeft: !openWindows.acrobat.isMaximized,
             }}
-            disableDragging={openWindows.acrobat.isMaximized}
+            disableDragging={isMobile || openWindows.acrobat.isMaximized}
             style={{
               zIndex: openWindows.acrobat.zIndex,
               pointerEvents: openWindows.acrobat.isMinimized ? "none" : "auto",
@@ -1589,26 +1612,51 @@ y las experiencias interactivas.`);
               transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
             }}
             onClick={() => focusWindow("acrobat")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 transition-all duration-300 ${openWindows.acrobat.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            className={`absolute ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "liquid-glass rounded-2xl border border-white/10 shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.acrobat.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
-            <div className="w-full h-full flex flex-col">
-              {/* Header de Acrobat */}
-              <div className="window-header h-[46px] bg-[#2d2d2d] border-b border-black/30 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none text-white">
-                {/* Botones de control estilo macOS */}
-                <div className="flex gap-2 items-center window-control-buttons">
-                  <div onClick={(e) => closeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
-                  <div onClick={(e) => toggleMaximizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+            <div className="w-full h-full flex flex-col bg-[#1c1c1e]">
+              {/* Header: iOS Nav Bar en mobile vs macOS Window Header en Desktop */}
+              {isMobile ? (
+                <div className="h-[50px] ios-nav-blur border-b border-white/10 flex items-center justify-between px-3.5 shrink-0 select-none text-white z-20">
+                  <button
+                    onClick={(e) => closeApp("acrobat", e)}
+                    className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
+                  >
+                    <span className="text-xl leading-none">‹</span>
+                    <span>Inicio</span>
+                  </button>
+                  <div className="flex items-center gap-1.5 max-w-[55%] truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-[15px] h-[15px] shrink-0">
+                      <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
+                      <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
+                    </svg>
+                    <span className="text-[14.5px] font-semibold text-white truncate">CV Matias Bazan</span>
+                  </div>
+                  <button
+                    onClick={(e) => closeApp("acrobat", e)}
+                    className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
+                  >
+                    Listo
+                  </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-[18px] h-[18px]">
-                    <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
-                    <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
-                  </svg>
-                  <span className="text-[13px] font-semibold text-white/90">Adobe Acrobat — CV_Matias_Bazan.pdf</span>
+              ) : (
+                <div className="window-header h-[46px] bg-[#2d2d2d] border-b border-black/30 flex items-center justify-between px-3 sm:px-4 cursor-grab active:cursor-grabbing select-none text-white shrink-0">
+                  {/* Botones de control estilo macOS */}
+                  <div className="flex gap-2 items-center window-control-buttons">
+                    <div onClick={(e) => closeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                    <div onClick={(e) => minimizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                    <div onClick={(e) => toggleMaximizeApp("acrobat", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                  </div>
+                  <div className="flex items-center gap-2 max-w-[60%] sm:max-w-[80%] truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-[18px] h-[18px] shrink-0">
+                      <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
+                      <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
+                    </svg>
+                    <span className="text-[12px] sm:text-[13px] font-semibold text-white/90 truncate">CV_Matias_Bazan.pdf</span>
+                  </div>
+                  <div className="w-[30px] sm:w-[60px]" /> {/* Spacer */}
                 </div>
-                <div className="w-[60px]" /> {/* Spacer */}
-              </div>
+              )}
 
               {/* Cuerpo del PDF */}
               <div className="flex flex-1 overflow-hidden bg-white">
@@ -1619,19 +1667,30 @@ y las experiencias interactivas.`);
                   title="CV Matias Bazan"
                 />
               </div>
+
+              {/* iOS Home Indicator Bar en Mobile */}
+              {isMobile && (
+                <div
+                  onClick={(e) => closeApp("acrobat", e)}
+                  className="h-[22px] bg-[#1c1c1e] flex items-center justify-center cursor-pointer shrink-0 active:opacity-60 transition"
+                  title="Deslizar para ir a Inicio"
+                >
+                  <div className="w-32 h-1 bg-white/40 rounded-full" />
+                </div>
+              )}
             </div>
           </Rnd>
         )}
 
-        {/* ==================== APLICACIÓN: FINDER (Apple File Explorer) ==================== */}
+        {/* ==================== APLICACIÓN: FINDER (Apple File Explorer / iOS Files) ==================== */}
         {openWindows.finder && openWindows.finder.isOpen && !openWindows.finder.isMinimized && (
           <Rnd
-            size={openWindows.finder.isMaximized ? { width: "100%", height: "calc(100% - 28px)" } : { width: openWindows.finder.size.width, height: openWindows.finder.size.height }}
-            position={openWindows.finder.isMaximized ? { x: 0, y: 28 } : isDraggingActive ? undefined : { x: openWindows.finder.position.x, y: openWindows.finder.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.finder.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.finder.size.width, height: openWindows.finder.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.finder.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.finder.position.x, y: openWindows.finder.position.y }}
             onDragStart={() => setIsDraggingActive(true)}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.finder.isMaximized) return;
+              if (openWindows.finder.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 finder: {
@@ -1641,7 +1700,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.finder.isMaximized) return;
+              if (openWindows.finder.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 finder: {
@@ -1651,10 +1710,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={550}
-            minHeight={350}
-            cancel=".window-control-buttons, input, .sidebar-link, button, a, .finder-draggable-item"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 450}
+            minHeight={isMobile ? 0 : 300}
+            cancel=".window-control-buttons, input, .sidebar-link, button, a, .finder-draggable-item, .ios-action-btn"
+            enableResizing={isMobile || openWindows.finder.isMaximized ? false : {
               top: !openWindows.finder.isMaximized,
               right: !openWindows.finder.isMaximized,
               bottom: !openWindows.finder.isMaximized,
@@ -1664,7 +1723,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.finder.isMaximized,
               topLeft: !openWindows.finder.isMaximized,
             }}
-            disableDragging={openWindows.finder.isMaximized}
+            disableDragging={isMobile || openWindows.finder.isMaximized}
             style={{
               zIndex: openWindows.finder.zIndex,
               pointerEvents: openWindows.finder.isMinimized ? "none" : "auto",
@@ -1675,105 +1734,146 @@ y las experiencias interactivas.`);
               transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
             }}
             onClick={() => focusWindow("finder")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 text-white font-sans transition-all duration-300 ${openWindows.finder.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            className={`absolute ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "liquid-glass rounded-2xl border border-white/10 shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none text-white font-sans transition-all duration-300 ${openWindows.finder.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
             <div className="w-full h-full flex flex-col bg-[#181a20] text-white overflow-hidden relative">
 
-              {/* Toolbar del Finder */}
-              <div className="window-header h-[52px] bg-[#1c1f26] border-b border-white/5 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
-                <div className="flex items-center gap-5">
-                  {/* Botones de control macOS */}
-                  <div className="flex gap-2 items-center window-control-buttons">
-                    <div onClick={(e) => closeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                    <div onClick={(e) => minimizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
-                    <div onClick={(e) => toggleMaximizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
-                  </div>
-
-                  {/* Botones de Navegación Atrás / Adelante */}
-                  <div className="flex gap-1 items-center font-sans">
+              {/* Toolbar del Finder: iOS Nav Bar en Mobile vs macOS Header en Desktop */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-b border-white/10 flex flex-col px-3.5 pt-2 pb-2 shrink-0 select-none z-20 gap-2">
+                  <div className="h-[38px] flex items-center justify-between">
                     <button
-                      onClick={navigateFinderBack}
-                      disabled={finderHistoryIndex <= 0}
-                      className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                      onClick={(e) => {
+                        if (finderHistoryIndex > 0) {
+                          navigateFinderBack();
+                        } else {
+                          closeApp("finder", e);
+                        }
+                      }}
+                      className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
                     >
-                      <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                      <span className="text-xl leading-none">‹</span>
+                      <span>{finderHistoryIndex > 0 ? "Atrás" : "Inicio"}</span>
                     </button>
+                    <span className="text-[15px] font-semibold text-white truncate max-w-[55%]">
+                      {finderPath.replace("~", "Archivos").split("/").pop()}
+                    </span>
                     <button
-                      onClick={navigateFinderForward}
-                      disabled={finderHistoryIndex >= finderHistory.length - 1}
-                      className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                      onClick={(e) => closeApp("finder", e)}
+                      className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
                     >
-                      <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                  </div>
-
-                  {/* Título de la Carpeta Actual */}
-                  <span className="text-[14px] font-bold text-white/90 truncate max-w-[200px]">
-                    {finderPath.replace("~", "Home").split("/").pop()}
-                  </span>
-                </div>
-
-                {/* Controles de vista del Finder (Igual a la imagen) */}
-                <div className="flex items-center gap-4">
-                  {/* Grupo selector de layouts */}
-                  <div className="flex bg-white/5 border border-white/10 rounded-lg p-0.5 items-center">
-                    <button
-                      onClick={() => setFinderViewMode("grid")}
-                      className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "grid" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setFinderViewMode("list")}
-                      className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "list" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
-                    >
-                      <List className="w-3.5 h-3.5" />
+                      Listo
                     </button>
                   </div>
 
-                  {/* Barra de búsqueda */}
-                  <div className="relative flex items-center bg-white/5 rounded-lg border border-white/10 px-2.5 py-1 select-text">
-                    <Search className="w-3.5 h-3.5 text-white/40 mr-1.5 flex-shrink-0" />
+                  {/* iOS Search Bar */}
+                  <div className="relative w-full">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-white/40 pointer-events-none" />
                     <input
                       type="text"
-                      placeholder="Buscar"
+                      placeholder="Buscar en Archivos"
                       value={finderSearch}
                       onChange={(e) => setFinderSearch(e.target.value)}
-                      className="bg-transparent border-none outline-none text-[11.5px] text-white placeholder-white/30 w-[110px] focus:w-[150px] transition-all p-0 font-sans"
+                      className="w-full bg-white/10 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:bg-white/15 transition"
                     />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="window-header h-[52px] bg-[#1c1f26] border-b border-white/5 flex items-center justify-between px-3 sm:px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-5">
+                    {/* Botones de control macOS */}
+                    <div className="flex gap-2 items-center window-control-buttons">
+                      <div onClick={(e) => closeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                      <div onClick={(e) => minimizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                      <div onClick={(e) => toggleMaximizeApp("finder", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                    </div>
+
+                    {/* Botones de Navegación Atrás / Adelante */}
+                    <div className="flex gap-0.5 sm:gap-1 items-center font-sans">
+                      <button
+                        onClick={navigateFinderBack}
+                        disabled={finderHistoryIndex <= 0}
+                        className="p-1 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                      <button
+                        onClick={navigateFinderForward}
+                        disabled={finderHistoryIndex >= finderHistory.length - 1}
+                        className="p-1 rounded hover:bg-white/10 transition cursor-pointer text-white/80 disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
+
+                    {/* Título de la Carpeta Actual */}
+                    <span className="text-[13px] sm:text-[14px] font-bold text-white/90 truncate max-w-[90px] sm:max-w-[200px]">
+                      {finderPath.replace("~", "Home").split("/").pop()}
+                    </span>
+                  </div>
+
+                  {/* Controles de vista del Finder */}
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Grupo selector de layouts */}
+                    <div className="hidden sm:flex bg-white/5 border border-white/10 rounded-lg p-0.5 items-center">
+                      <button
+                        onClick={() => setFinderViewMode("grid")}
+                        className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "grid" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setFinderViewMode("list")}
+                        className={`p-1 rounded transition-all cursor-pointer ${finderViewMode === "list" ? "bg-white/15 text-white" : "text-white/60 hover:text-white"}`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Input de Búsqueda */}
+                    <div className="relative flex items-center">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 text-white/40 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Buscar"
+                        value={finderSearch}
+                        onChange={(e) => setFinderSearch(e.target.value)}
+                        className="bg-black/30 border border-white/10 rounded-lg pl-8 pr-2.5 py-1 text-xs text-white placeholder-white/40 focus:outline-none focus:border-white/30 transition w-[70px] sm:w-[110px]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Contenido Principal de Finder */}
               <div className="flex-1 flex overflow-hidden">
 
                 {/* Sidebar Izquierda (Categorías de macOS) */}
-                <div className="w-[185px] bg-[#121419]/70 border-r border-white/5 p-2.5 flex flex-col gap-4.5 shrink-0 select-none overflow-y-auto">
+                <div className="w-[100px] sm:w-[185px] bg-[#121419]/70 border-r border-white/5 p-2 sm:p-2.5 flex flex-col gap-3 sm:gap-4.5 shrink-0 select-none overflow-y-auto">
 
                   {/* Favoritos */}
                   <div>
-                    <span className="text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-2 block mb-1.5">Favoritos</span>
+                    <span className="text-[9px] sm:text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-1 sm:px-2 block mb-1">Favoritos</span>
                     <div className="flex flex-col gap-0.5">
                       <div
                         onClick={() => navigateToFinderFolder("~/Desktop")}
-                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath === "~/Desktop" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                        className={`sidebar-link flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-[12.5px] transition cursor-pointer ${finderPath === "~/Desktop" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
                       >
-                        <Monitor className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <Monitor className="w-[14px] sm:w-[16px] h-[14px] sm:h-[16px] text-[#0a84ff] shrink-0" />
                         <span className="truncate">Escritorio</span>
                       </div>
                       <div
                         onClick={() => navigateToFinderFolder("~/Documents")}
-                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath.startsWith("~/Documents") && !finderPath.includes("Proyectos") ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                        className={`sidebar-link flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-[12.5px] transition cursor-pointer ${finderPath.startsWith("~/Documents") && !finderPath.includes("Proyectos") ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
                       >
-                        <FileText className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <FileText className="w-[14px] sm:w-[16px] h-[14px] sm:h-[16px] text-[#0a84ff] shrink-0" />
                         <span className="truncate">Documentos</span>
                       </div>
                       <div
                         onClick={() => navigateToFinderFolder("~")}
-                        className="sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] text-white/70 hover:bg-white/5 hover:text-white cursor-pointer"
+                        className="sidebar-link flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-[12.5px] text-white/70 hover:bg-white/5 hover:text-white cursor-pointer"
                       >
-                        <FileDown className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <FileDown className="w-[14px] sm:w-[16px] h-[14px] sm:h-[16px] text-[#0a84ff] shrink-0" />
                         <span className="truncate">Descargas</span>
                       </div>
                     </div>
@@ -1781,13 +1881,13 @@ y las experiencias interactivas.`);
 
                   {/* Ubicaciones */}
                   <div>
-                    <span className="text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-2 block mb-1.5">Ubicaciones</span>
+                    <span className="text-[9px] sm:text-[9.5px] font-bold text-white/25 uppercase tracking-wider px-1 sm:px-2 block mb-1">Ubicaciones</span>
                     <div className="flex flex-col gap-0.5">
                       <div
                         onClick={() => navigateToFinderFolder("~")}
-                        className={`sidebar-link flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12.5px] transition cursor-pointer ${finderPath === "~" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+                        className={`sidebar-link flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-[12.5px] transition cursor-pointer ${finderPath === "~" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
                       >
-                        <HomeIcon className="w-[16px] h-[16px] text-[#0a84ff] shrink-0" />
+                        <HomeIcon className="w-[14px] sm:w-[16px] h-[14px] sm:h-[16px] text-[#0a84ff] shrink-0" />
                         <span className="truncate">matybazan</span>
                       </div>
                     </div>
@@ -1796,7 +1896,7 @@ y las experiencias interactivas.`);
                 </div>
 
                 {/* Panel de Archivos (Grid de macOS) */}
-                <div className="flex-1 flex flex-col bg-[#181a20] overflow-hidden p-5 select-none">
+                <div className="flex-1 flex flex-col bg-[#181a20] overflow-hidden p-2 sm:p-5 select-none">
 
                   {/* Grid / List de Archivos */}
                   <div ref={finderGridRef} className="flex-1 overflow-y-auto min-h-0 pointer-events-auto">
@@ -1809,8 +1909,8 @@ y las experiencias interactivas.`);
                       </div>
                     ) : finderViewMode === "list" ? (
                       /* List View Mode */
-                      <div className="w-full flex flex-col font-sans text-[12.5px] select-none text-white/95">
-                        <div className="flex border-b border-white/10 pb-2 mb-2 px-2 text-white/40 text-[11px] font-bold uppercase tracking-wider">
+                      <div className="w-full flex flex-col font-sans text-[12px] sm:text-[12.5px] select-none text-white/95">
+                        <div className="flex border-b border-white/10 pb-2 mb-2 px-2 text-white/40 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                           <span className="w-1/2">Nombre</span>
                           <span className="w-1/4">Clase</span>
                           <span className="w-1/4">Tamaño</span>
@@ -1831,54 +1931,62 @@ y las experiencias interactivas.`);
                               else if (name.endsWith(".json")) kind = "Configuración JSON";
                               else if (name.endsWith(".md")) kind = "Documento Markdown";
 
+                              const openItem = () => {
+                                if (isFolder) {
+                                  const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
+                                  navigateToFinderFolder(nextPath);
+                                } else if (isPdf) {
+                                  openApp("acrobat");
+                                } else if (isChromeShortcut) {
+                                  openApp("chrome");
+                                } else {
+                                  if (value && value.startsWith("[Archivo de GitHub")) {
+                                    const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
+                                    if (downloadUrl) {
+                                      setViewingFileContent({ name, content: "Cargando código de GitHub..." });
+                                      fetch(downloadUrl)
+                                        .then(res => res.text())
+                                        .then(content => {
+                                          setViewingFileContent({ name, content });
+                                          setTerminalFS(prev => {
+                                            const updated = { ...prev };
+                                            const currentDir = { ...(updated[finderPath] || {}) };
+                                            currentDir[name] = content;
+                                            updated[finderPath] = currentDir;
+                                            return updated;
+                                          });
+                                        })
+                                        .catch(() => {
+                                          setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
+                                        });
+                                    }
+                                  } else {
+                                    setViewingFileContent({ name, content: value || "" });
+                                  }
+                                }
+                              };
+
                               return (
                                 <div
                                   key={name}
-                                  onClick={(e) => { e.stopPropagation(); setSelectedFileName(name); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedFileName(name);
+                                    if (isMobile) openItem();
+                                  }}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    if (isFolder) {
-                                      const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
-                                      navigateToFinderFolder(nextPath);
-                                    } else if (isPdf) {
-                                      openApp("acrobat");
-                                    } else if (isChromeShortcut) {
-                                      openApp("chrome");
-                                    } else {
-                                      if (value && value.startsWith("[Archivo de GitHub")) {
-                                        const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
-                                        if (downloadUrl) {
-                                          setViewingFileContent({ name, content: "Cargando código de GitHub..." });
-                                          fetch(downloadUrl)
-                                            .then(res => res.text())
-                                            .then(content => {
-                                              setViewingFileContent({ name, content });
-                                              setTerminalFS(prev => {
-                                                const updated = { ...prev };
-                                                const currentDir = { ...(updated[finderPath] || {}) };
-                                                currentDir[name] = content;
-                                                updated[finderPath] = currentDir;
-                                                return updated;
-                                              });
-                                            })
-                                            .catch(() => {
-                                              setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
-                                            });
-                                        }
-                                      } else {
-                                        setViewingFileContent({ name, content: value || "" });
-                                      }
-                                    }
+                                    openItem();
                                   }}
-                                  className={`flex py-2 px-2.5 rounded-md cursor-pointer transition items-center ${isSelected ? "bg-[#2563eb]/30 text-white font-medium shadow-sm" : "hover:bg-white/5 text-white/80"
+                                  className={`flex py-2 px-2 rounded-md cursor-pointer transition items-center text-xs sm:text-sm ${isSelected ? "bg-[#2563eb]/30 text-white font-medium shadow-sm" : "hover:bg-white/5 text-white/80"
                                     }`}
                                 >
                                   <div className="w-1/2 flex items-center gap-2 truncate">
-                                    <span className="text-[15px]">{isFolder ? "📁" : isPdf ? "📄" : isChromeShortcut ? "🌐" : "📄"}</span>
+                                    <span className="text-[14px] sm:text-[15px]">{isFolder ? "📁" : isPdf ? "📄" : isChromeShortcut ? "🌐" : "📄"}</span>
                                     <span className="truncate">{name}</span>
                                   </div>
-                                  <span className="w-1/4 text-white/40 truncate">{kind}</span>
-                                  <span className="w-1/4 text-white/40">{isFolder ? "--" : "4 KB"}</span>
+                                  <span className="w-1/4 text-white/40 truncate text-[11px]">{kind}</span>
+                                  <span className="w-1/4 text-white/40 text-[11px]">{isFolder ? "--" : "4 KB"}</span>
                                 </div>
                               );
                             })}
@@ -1886,7 +1994,7 @@ y las experiencias interactivas.`);
                       </div>
                     ) : (
                       /* Grid View Mode */
-                      <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 p-1 sm:p-2">
                         {Object.entries(terminalFS[finderPath] || {})
                           .filter(([name]) => name.toLowerCase().includes(finderSearch.toLowerCase()))
                           .map(([name, value]) => {
@@ -1900,49 +2008,57 @@ y las experiencias interactivas.`);
 
                             const isSelected = selectedFileName === name;
 
+                            const openItem = () => {
+                              if (isFolder) {
+                                const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
+                                navigateToFinderFolder(nextPath);
+                              } else if (isPdf) {
+                                openApp("acrobat");
+                              } else if (isChromeShortcut) {
+                                openApp("chrome");
+                              } else {
+                                if (value && value.startsWith("[Archivo de GitHub")) {
+                                  const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
+                                  if (downloadUrl) {
+                                    setViewingFileContent({ name, content: "Cargando código de GitHub..." });
+                                    fetch(downloadUrl)
+                                      .then(res => res.text())
+                                      .then(content => {
+                                        setViewingFileContent({ name, content });
+                                        setTerminalFS(prev => {
+                                          const updated = { ...prev };
+                                          const currentDir = { ...(updated[finderPath] || {}) };
+                                          currentDir[name] = content;
+                                          updated[finderPath] = currentDir;
+                                          return updated;
+                                        });
+                                      })
+                                      .catch(() => {
+                                        setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
+                                      });
+                                  }
+                                } else {
+                                  setViewingFileContent({ name, content: value || "" });
+                                }
+                              }
+                            };
+
                             return (
                               <motion.div
-                                drag
+                                drag={!isMobile}
                                 dragConstraints={finderGridRef}
                                 dragElastic={0.08}
                                 dragMomentum={false}
                                 whileDrag={{ scale: 1.05, zIndex: 99, cursor: "grabbing" }}
                                 key={name}
-                                onClick={(e) => { e.stopPropagation(); setSelectedFileName(name); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedFileName(name);
+                                  if (isMobile) openItem();
+                                }}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
-                                  if (isFolder) {
-                                    const nextPath = finderPath === "~" ? `~/${name}` : `${finderPath}/${name}`;
-                                    navigateToFinderFolder(nextPath);
-                                  } else if (isPdf) {
-                                    openApp("acrobat");
-                                  } else if (isChromeShortcut) {
-                                    openApp("chrome");
-                                  } else {
-                                    if (value && value.startsWith("[Archivo de GitHub")) {
-                                      const downloadUrl = value.match(/URL de descarga: (.*)/)?.[1];
-                                      if (downloadUrl) {
-                                        setViewingFileContent({ name, content: "Cargando código de GitHub..." });
-                                        fetch(downloadUrl)
-                                          .then(res => res.text())
-                                          .then(content => {
-                                            setViewingFileContent({ name, content });
-                                            setTerminalFS(prev => {
-                                              const updated = { ...prev };
-                                              const currentDir = { ...(updated[finderPath] || {}) };
-                                              currentDir[name] = content;
-                                              updated[finderPath] = currentDir;
-                                              return updated;
-                                            });
-                                          })
-                                          .catch(() => {
-                                            setViewingFileContent({ name, content: "Error al descargar el contenido del archivo desde GitHub." });
-                                          });
-                                      }
-                                    } else {
-                                      setViewingFileContent({ name, content: value || "" });
-                                    }
-                                  }
+                                  openItem();
                                 }}
                                 className={`finder-draggable-item flex flex-col items-center p-2 rounded-lg cursor-pointer text-center select-none transition group relative ${isSelected ? "bg-[#2563eb]/30 border border-[#2563eb]/60" : "hover:bg-white/5 border border-transparent"
                                   }`}
@@ -2050,17 +2166,53 @@ y las experiencias interactivas.`);
                 </div>
               )}
 
+              {/* iOS Bottom Tab Bar & Home Indicator en Mobile */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-t border-white/10 flex flex-col shrink-0 select-none z-20">
+                  <div className="h-[48px] flex items-center justify-around px-2">
+                    <button
+                      onClick={() => navigateToFinderFolder("~/Documents")}
+                      className={`flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${finderPath.startsWith("~/Documents") && !finderPath.includes("Proyectos") && !finderPath.includes("CV") ? "text-[#007AFF]" : "text-white/50"}`}
+                    >
+                      <FileText className="w-5 h-5" />
+                      <span>Documentos</span>
+                    </button>
+                    <button
+                      onClick={() => navigateToFinderFolder("~/Documents/Proyectos")}
+                      className={`flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${finderPath.includes("Proyectos") ? "text-[#007AFF]" : "text-white/50"}`}
+                    >
+                      <LayoutGrid className="w-5 h-5" />
+                      <span>Proyectos</span>
+                    </button>
+                    <button
+                      onClick={() => navigateToFinderFolder("~/Documents/CV")}
+                      className={`flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${finderPath.includes("CV") ? "text-[#007AFF]" : "text-white/50"}`}
+                    >
+                      <FileDown className="w-5 h-5" />
+                      <span>Mi CV</span>
+                    </button>
+                  </div>
+                  {/* Home Indicator */}
+                  <div
+                    onClick={(e) => closeApp("finder", e)}
+                    className="h-[20px] flex items-center justify-center cursor-pointer active:opacity-60 transition"
+                  >
+                    <div className="w-32 h-1 bg-white/40 rounded-full" />
+                  </div>
+                </div>
+              ) : null}
+
             </div>
           </Rnd>
         )}
 
-        {/* ==================== APLICACIÓN: NOTAS (Carta de Presentación) ==================== */}
+        {/* ==================== APLICACIÓN: NOTAS (Carta de Presentación / iOS Notes) ==================== */}
         {openWindows.notes.isOpen && (
           <Rnd
-            size={openWindows.notes.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.notes.size.width, height: openWindows.notes.size.height }}
-            position={openWindows.notes.isMaximized ? { x: 0, y: 0 } : { x: openWindows.notes.position.x, y: openWindows.notes.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.notes.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.notes.size.width, height: openWindows.notes.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.notes.isMaximized ? { x: 0, y: 0 } : { x: openWindows.notes.position.x, y: openWindows.notes.position.y }}
             onDrag={(e, d) => {
-              if (openWindows.notes.isMaximized) return;
+              if (openWindows.notes.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 notes: {
@@ -2071,7 +2223,7 @@ y las experiencias interactivas.`);
             }}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.notes.isMaximized) return;
+              if (openWindows.notes.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 notes: {
@@ -2081,7 +2233,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.notes.isMaximized) return;
+              if (openWindows.notes.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 notes: {
@@ -2091,10 +2243,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={300}
-            minHeight={200}
-            cancel=".window-control-buttons, input, iframe, button, a"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 300}
+            minHeight={isMobile ? 0 : 200}
+            cancel=".window-control-buttons, input, iframe, button, a, .ios-action-btn"
+            enableResizing={isMobile || openWindows.notes.isMaximized ? false : {
               top: !openWindows.notes.isMaximized,
               right: !openWindows.notes.isMaximized,
               bottom: !openWindows.notes.isMaximized,
@@ -2104,7 +2256,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.notes.isMaximized,
               topLeft: !openWindows.notes.isMaximized,
             }}
-            disableDragging={openWindows.notes.isMaximized}
+            disableDragging={isMobile || openWindows.notes.isMaximized}
             style={{
               zIndex: openWindows.notes.zIndex,
               pointerEvents: openWindows.notes.isMinimized ? "none" : "auto",
@@ -2115,42 +2267,79 @@ y las experiencias interactivas.`);
               transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
             }}
             onClick={() => focusWindow("notes")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.notes.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            className={`absolute ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "liquid-glass rounded-2xl border border-white/10 shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.notes.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
-            <div className="w-full h-full flex flex-col bg-[#272728] text-white font-sans overflow-hidden">
-              {/* Header / Toolbar nativo estilo Apple Notes de macOS */}
-              <div className="window-header h-[50px] bg-[#1e1e1f] border-b border-white/10 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
-                <div className="flex items-center gap-4">
-                  {/* Botones de control macOS */}
-                  <div className="flex gap-2 items-center window-control-buttons">
-                    <div onClick={(e) => closeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                    <div onClick={(e) => minimizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
-                    <div onClick={(e) => toggleMaximizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+            <div className="w-full h-full flex flex-col bg-[#1e1e1f] text-white font-sans overflow-hidden">
+              {/* Header: iOS Nav Bar en mobile vs macOS Header en Desktop */}
+              {isMobile ? (
+                <div className="h-[50px] ios-nav-blur border-b border-white/10 flex items-center justify-between px-3.5 shrink-0 select-none z-20">
+                  {mobileNotesView === "note" ? (
+                    <button
+                      onClick={() => setMobileNotesView("list")}
+                      className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
+                    >
+                      <span className="text-xl leading-none">‹</span>
+                      <span>Notas</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => closeApp("notes", e)}
+                      className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
+                    >
+                      <span className="text-xl leading-none">‹</span>
+                      <span>Inicio</span>
+                    </button>
+                  )}
+                  <span className="text-[15px] font-semibold text-white truncate max-w-[55%]">
+                    {mobileNotesView === "note" ? (notesList.find(n => n.id === activeNoteId)?.title || "Nota") : "Notas"}
+                  </span>
+                  <button
+                    onClick={(e) => closeApp("notes", e)}
+                    className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
+                  >
+                    Listo
+                  </button>
+                </div>
+              ) : (
+                <div className="window-header h-[50px] bg-[#1e1e1f] border-b border-white/10 flex items-center justify-between px-3 sm:px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                  <div className="flex items-center gap-3">
+                    {/* Botones de control macOS */}
+                    <div className="flex gap-2 items-center window-control-buttons">
+                      <div onClick={(e) => closeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                      <div onClick={(e) => minimizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                      <div onClick={(e) => toggleMaximizeApp("notes", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                    </div>
+
+                    {/* Iconos de la barra de herramientas de Apple Notes */}
+                    <div className="flex items-center gap-3 text-white/70 ml-2">
+                      <button onClick={() => setShowNotesSidebar(!showNotesSidebar)} className="hover:text-white transition cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Iconos de la barra de herramientas de Apple Notes */}
-                  <div className="flex items-center gap-3 text-white/70 ml-2">
-                    <button onClick={() => setShowNotesSidebar(!showNotesSidebar)} className="hover:text-white transition cursor-pointer">
+                  <div className="flex items-center gap-3 text-white/70">
+                    <button
+                      onClick={() => {
+                        handleCreateNote();
+                      }}
+                      className="hover:text-white transition cursor-pointer"
+                      title="Nueva Nota"
+                    >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                       </svg>
                     </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 text-white/70">
-                  <button onClick={handleCreateNote} className="hover:text-white transition cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* Layout de 3 columnas de Apple Notes de macOS */}
               <div className="flex-1 flex overflow-hidden">
-                {/* Columna 1: Carpetas */}
-                {showNotesSidebar && (
+                {/* Columna 1: Carpetas (Oculta en mobile) */}
+                {showNotesSidebar && !isMobile && (
                   <div className="w-[180px] bg-[#1e1e1f] border-r border-white/5 p-3 flex flex-col gap-1 text-[12px] text-white/80 shrink-0 select-none">
                     <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider px-2 mb-1">iCloud</div>
                     <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 font-medium">
@@ -2164,7 +2353,7 @@ y las experiencias interactivas.`);
                 )}
 
                 {/* Columna 2: Lista de notas en la carpeta */}
-                <div className="w-[220px] bg-[#232324] border-r border-white/5 p-2 flex flex-col gap-1 shrink-0 overflow-y-auto select-none">
+                <div className={`${isMobile && mobileNotesView === "note" ? "hidden" : "w-full"} sm:w-[220px] bg-[#232324] border-r border-white/5 p-2 flex flex-col gap-1 shrink-0 overflow-y-auto select-none`}>
                   {/* Buscador */}
                   <div className="px-2 mb-2 select-text">
                     <div className="relative flex items-center bg-[#1c1c1e] rounded-md border border-white/10 px-2 py-1">
@@ -2192,7 +2381,10 @@ y las experiencias interactivas.`);
                       return (
                         <div
                           key={note.id}
-                          onClick={() => setActiveNoteId(note.id)}
+                          onClick={() => {
+                            setActiveNoteId(note.id);
+                            if (isMobile) setMobileNotesView("note");
+                          }}
                           className={`p-3 rounded-xl border cursor-pointer transition relative group ${activeNoteId === note.id ? "bg-white/10 border-white/10" : "hover:bg-white/5 border-transparent"
                             }`}
                         >
@@ -2226,7 +2418,7 @@ y las experiencias interactivas.`);
                   if (!activeNote) return null;
 
                   return (
-                    <div className="flex-1 bg-[#1c1c1e] p-8 overflow-y-auto text-[13.5px] text-white/90 font-sans leading-relaxed select-text flex flex-col">
+                    <div className={`${isMobile && mobileNotesView === "list" ? "hidden" : "flex-1"} bg-[#1c1c1e] p-4 sm:p-8 overflow-y-auto text-[13px] sm:text-[13.5px] text-white/90 font-sans leading-relaxed select-text flex flex-col`}>
                       <div className="max-w-[650px] mx-auto w-full flex-1 flex flex-col">
                         {activeNote.category === "projects" ? (
                           <>
@@ -2507,17 +2699,47 @@ y las experiencias interactivas.`);
                   );
                 })()}
               </div>
+
+              {/* iOS Bottom Notes Bar & Home Indicator en Mobile */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-t border-white/10 flex flex-col shrink-0 select-none z-20">
+                  <div className="h-[44px] flex items-center justify-between px-4">
+                    <span className="text-[12px] text-white/50 font-sans">
+                      {notesList.length} {notesList.length === 1 ? "nota" : "notas"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        handleCreateNote();
+                        setMobileNotesView("note");
+                      }}
+                      className="text-[#007AFF] hover:text-blue-400 p-1.5 rounded-lg active:bg-white/10 transition cursor-pointer"
+                      title="Nueva Nota"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                  </div>
+                  {/* Home Indicator */}
+                  <div
+                    onClick={(e) => closeApp("notes", e)}
+                    className="h-[20px] flex items-center justify-center cursor-pointer active:opacity-60 transition"
+                  >
+                    <div className="w-32 h-1 bg-white/40 rounded-full" />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Rnd>
         )}
 
-        {/* ==================== APLICACIÓN: TERMINAL (CLI) ==================== */}
+        {/* ==================== APLICACIÓN: TERMINAL (CLI / iOS Terminal) ==================== */}
         {openWindows.terminal.isOpen && !openWindows.terminal.isMinimized && (
           <Rnd
-            size={openWindows.terminal.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.terminal.size.width, height: openWindows.terminal.size.height }}
-            position={openWindows.terminal.isMaximized ? { x: 0, y: 0 } : { x: openWindows.terminal.position.x, y: openWindows.terminal.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.terminal.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.terminal.size.width, height: openWindows.terminal.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.terminal.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.terminal.position.x, y: openWindows.terminal.position.y }}
             onDrag={(e, d) => {
-              if (openWindows.terminal.isMaximized) return;
+              if (openWindows.terminal.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 terminal: {
@@ -2528,7 +2750,7 @@ y las experiencias interactivas.`);
             }}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.terminal.isMaximized) return;
+              if (openWindows.terminal.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 terminal: {
@@ -2538,7 +2760,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.terminal.isMaximized) return;
+              if (openWindows.terminal.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 terminal: {
@@ -2548,10 +2770,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={300}
-            minHeight={200}
-            cancel=".window-control-buttons, input, iframe, button, a"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 300}
+            minHeight={isMobile ? 0 : 200}
+            cancel=".window-control-buttons, input, iframe, button, a, .terminal-shortcut, .ios-action-btn"
+            enableResizing={isMobile || openWindows.terminal.isMaximized ? false : {
               top: !openWindows.terminal.isMaximized,
               right: !openWindows.terminal.isMaximized,
               bottom: !openWindows.terminal.isMaximized,
@@ -2561,7 +2783,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.terminal.isMaximized,
               topLeft: !openWindows.terminal.isMaximized,
             }}
-            disableDragging={openWindows.terminal.isMaximized}
+            disableDragging={isMobile || openWindows.terminal.isMaximized}
             style={{
               zIndex: openWindows.terminal.zIndex,
               pointerEvents: openWindows.terminal.isMinimized ? "none" : "auto",
@@ -2572,24 +2794,45 @@ y las experiencias interactivas.`);
               transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
             }}
             onClick={() => focusWindow("terminal")}
-            className={`absolute liquid-glass rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.terminal.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            className={`absolute ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "liquid-glass rounded-2xl border border-white/10 shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.terminal.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
-            <div className="w-full h-full flex flex-col">
-              {/* Header de Terminal */}
-              <div className="window-header h-[36px] bg-black/60 border-b border-white/10 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none">
-                <div className="flex gap-2 items-center window-control-buttons">
-                  <div onClick={(e) => closeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
-                  <div onClick={(e) => toggleMaximizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+            <div className="w-full h-full flex flex-col bg-black">
+              {/* Header: iOS Nav Bar en mobile vs macOS Window Header en Desktop */}
+              {isMobile ? (
+                <div className="h-[50px] ios-nav-blur border-b border-white/10 flex items-center justify-between px-3.5 shrink-0 select-none z-20">
+                  <button
+                    onClick={(e) => closeApp("terminal", e)}
+                    className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
+                  >
+                    <span className="text-xl leading-none">‹</span>
+                    <span>Inicio</span>
+                  </button>
+                  <span className="text-[15px] font-semibold text-white font-mono truncate max-w-[55%]">
+                    Terminal — zsh
+                  </span>
+                  <button
+                    onClick={(e) => closeApp("terminal", e)}
+                    className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
+                  >
+                    Listo
+                  </button>
                 </div>
-                <span className="text-[11.5px] font-mono text-white/50">matias@tahoe-mac: {terminalCwd} — zsh</span>
-                <div className="w-[60px]" />
-              </div>
+              ) : (
+                <div className="window-header h-[36px] bg-black/60 border-b border-white/10 flex items-center justify-between px-3 sm:px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                  <div className="flex gap-2 items-center window-control-buttons">
+                    <div onClick={(e) => closeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                    <div onClick={(e) => minimizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                    <div onClick={(e) => toggleMaximizeApp("terminal", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                  </div>
+                  <span className="text-[10.5px] sm:text-[11.5px] font-mono text-white/50 truncate max-w-[65%] sm:max-w-[80%]">matias@tahoe-mac: {terminalCwd} — zsh</span>
+                  <div className="w-[30px] sm:w-[60px]" />
+                </div>
+              )}
 
               {/* Contenido Terminal */}
-              <div ref={terminalContainerRef} className="flex-1 bg-black/90 p-4 font-mono text-emerald-400 text-[12px] overflow-y-auto flex flex-col gap-1 leading-normal cursor-text">
+              <div ref={terminalContainerRef} className="flex-1 bg-black/90 p-3 sm:p-4 font-mono text-emerald-400 text-[11px] sm:text-[12px] overflow-y-auto flex flex-col gap-1 leading-normal cursor-text">
                 {terminalHistory.map((line, idx) => (
-                  <div key={idx} className="whitespace-pre-wrap">
+                  <div key={idx} className="whitespace-pre-wrap break-words">
                     {line.type === "input" ? (
                       <span className="text-emerald-300 font-semibold">{line.text}</span>
                     ) : line.type === "error" ? (
@@ -2603,30 +2846,112 @@ y las experiencias interactivas.`);
                 ))}
 
                 {/* Input Form */}
-                <form onSubmit={handleTerminalSubmit} className="flex items-center gap-1.5 mt-1">
-                  <span className="text-emerald-300 font-semibold"><span className="text-blue-400">matias@tahoe-mac</span> <span className="text-yellow-300">{terminalCwd}</span> %</span>
+                <form onSubmit={handleTerminalSubmit} className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span className="text-emerald-300 font-semibold text-[11px] sm:text-[12px]"><span className="text-blue-400">matias</span> <span className="text-yellow-300">{terminalCwd}</span> %</span>
                   <input
                     type="text"
                     value={terminalInput}
                     onChange={(e) => setTerminalInput(e.target.value)}
-                    className="flex-1 bg-transparent border-none outline-none text-emerald-300 font-mono text-[12px] p-0"
+                    className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-emerald-300 font-mono text-[11px] sm:text-[12px] p-0"
                     autoFocus
                     spellCheck={false}
                   />
                 </form>
                 <div ref={terminalBottomRef} />
               </div>
+
+              {/* Barra de atajos rápidos para Mobile */}
+              {isMobile && (
+                <div className="bg-[#111] border-t border-white/10 p-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 select-none">
+                  {["help", "neofetch", "skills", "about", "ls", "clear"].map((cmd) => (
+                    <button
+                      key={cmd}
+                      type="button"
+                      onClick={() => {
+                        setTerminalInput(cmd);
+                        // Trigger submit
+                        setTimeout(() => {
+                          const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                          // Execute command directly
+                          setTerminalHistory(prev => [
+                            ...prev,
+                            { type: "input", text: `matias@tahoe-mac ${terminalCwd} % ${cmd}` }
+                          ]);
+                          setTerminalInput("");
+                          if (cmd === "clear") {
+                            setTerminalHistory([]);
+                          } else if (cmd === "help") {
+                            setTerminalHistory(prev => [
+                              ...prev,
+                              { type: "output", text: "Comandos disponibles:" },
+                              { type: "output", text: "  about     - Resumen profesional" },
+                              { type: "output", text: "  skills    - Stack técnico" },
+                              { type: "output", text: "  neofetch  - Especificaciones del sistema" },
+                              { type: "output", text: "  ls        - Listar archivos" },
+                              { type: "output", text: "  clear     - Limpiar pantalla" },
+                            ]);
+                          } else if (cmd === "neofetch") {
+                            setTerminalHistory(prev => [
+                              ...prev,
+                              { type: "success", text: "OS: macOS Tahoe 26.0" },
+                              { type: "success", text: "Host: MacBook Pro 16\" (Apple M3 Max)" },
+                              { type: "success", text: "Kernel: Darwin 24.0.0" },
+                              { type: "success", text: "Uptime: 99.9% disponibilidad" },
+                              { type: "success", text: "Shell: zsh 5.9" },
+                              { type: "success", text: "Role: Full Stack Developer & UI/UX" },
+                            ]);
+                          } else if (cmd === "about") {
+                            setTerminalHistory(prev => [
+                              ...prev,
+                              { type: "output", text: "Matias Bazan — Desarrollador Full Stack & Diseñador UI/UX" },
+                              { type: "output", text: "Especialista en React, Next.js, TypeScript, Tailwind, Node.js y Flutter." },
+                            ]);
+                          } else if (cmd === "skills") {
+                            setTerminalHistory(prev => [
+                              ...prev,
+                              { type: "output", text: "Frontend: React 19, Next.js, TypeScript, TailwindCSS, Framer Motion" },
+                              { type: "output", text: "Mobile: Flutter, Dart" },
+                              { type: "output", text: "Backend: Node.js, Express, PostgreSQL, Supabase, Vercel" },
+                              { type: "output", text: "Diseño: Figma, Adobe Illustrator, Photoshop" },
+                            ]);
+                          } else if (cmd === "ls") {
+                            const files = Object.keys(terminalFS[terminalCwd] || {});
+                            setTerminalHistory(prev => [
+                              ...prev,
+                              { type: "output", text: files.join("   ") || "(carpeta vacía)" }
+                            ]);
+                          }
+                        }, 50);
+                      }}
+                      className="terminal-shortcut px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-emerald-300 font-mono text-[11px] font-semibold transition shrink-0 cursor-pointer"
+                    >
+                      {cmd}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* iOS Home Indicator en Mobile */}
+              {isMobile && (
+                <div
+                  onClick={(e) => closeApp("terminal", e)}
+                  className="h-[22px] bg-black flex items-center justify-center cursor-pointer shrink-0 active:opacity-60 transition"
+                  title="Deslizar para ir a Inicio"
+                >
+                  <div className="w-32 h-1 bg-white/40 rounded-full" />
+                </div>
+              )}
             </div>
           </Rnd>
         )}
 
-        {/* ==================== APLICACIÓN: GOOGLE CHROME ==================== */}
+        {/* ==================== APLICACIÓN: GOOGLE CHROME (Navegador / iOS Safari & Chrome) ==================== */}
         {openWindows.chrome.isOpen && !openWindows.chrome.isMinimized && (
           <Rnd
-            size={openWindows.chrome.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.chrome.size.width, height: openWindows.chrome.size.height }}
-            position={openWindows.chrome.isMaximized ? { x: 0, y: 0 } : { x: openWindows.chrome.position.x, y: openWindows.chrome.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.chrome.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.chrome.size.width, height: openWindows.chrome.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.chrome.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.chrome.position.x, y: openWindows.chrome.position.y }}
             onDrag={(e, d) => {
-              if (openWindows.chrome.isMaximized) return;
+              if (openWindows.chrome.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 chrome: {
@@ -2637,7 +2962,7 @@ y las experiencias interactivas.`);
             }}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.chrome.isMaximized) return;
+              if (openWindows.chrome.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 chrome: {
@@ -2647,7 +2972,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.chrome.isMaximized) return;
+              if (openWindows.chrome.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 chrome: {
@@ -2657,10 +2982,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={300}
-            minHeight={200}
-            cancel=".window-control-buttons, .window-no-drag, input, iframe, button, a"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 300}
+            minHeight={isMobile ? 0 : 200}
+            cancel=".window-control-buttons, .window-no-drag, input, iframe, button, a, .ios-action-btn"
+            enableResizing={isMobile || openWindows.chrome.isMaximized ? false : {
               top: !openWindows.chrome.isMaximized,
               right: !openWindows.chrome.isMaximized,
               bottom: !openWindows.chrome.isMaximized,
@@ -2670,7 +2995,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.chrome.isMaximized,
               topLeft: !openWindows.chrome.isMaximized,
             }}
-            disableDragging={openWindows.chrome.isMaximized}
+            disableDragging={isMobile || openWindows.chrome.isMaximized}
             style={{
               zIndex: openWindows.chrome.zIndex,
               pointerEvents: openWindows.chrome.isMinimized ? "none" : "auto",
@@ -2681,21 +3006,140 @@ y las experiencias interactivas.`);
               transition: "transform 0.4s cubic-bezier(0.25, 1, 0.25, 1), opacity 0.35s ease-in-out",
             }}
             onClick={() => focusWindow("chrome")}
-            className={`absolute bg-[#b2cbdc] overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.chrome.isMaximized ? "rounded-none border-none" : "border border-[#8da4b4] rounded-2xl"
-              } ${openWindows.chrome.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            className={`absolute ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "bg-[#b2cbdc] border border-[#8da4b4] rounded-2xl shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none transition-all duration-300 ${openWindows.chrome.isMinimized ? "pointer-events-none opacity-0" : "opacity-100"}`}
           >
-            <div className="w-full h-full flex flex-col bg-[#b2cbdc]">
-              {/* Header de Chrome: Tabs */}
-              <div className="window-header h-[42px] bg-gradient-to-b from-[#c5d8e7] to-[#abbfcb] border-b border-[#8da4b4] flex items-end justify-between px-3 cursor-grab active:cursor-grabbing select-none relative">
-                {/* Botones de control estilo macOS */}
-                <div className="flex gap-2 items-center window-control-buttons mb-2.5">
-                  <div onClick={(e) => closeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
-                  <div onClick={(e) => minimizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
-                  <div onClick={(e) => toggleMaximizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
-                </div>
+            <div className="w-full h-full flex flex-col bg-[#f2f2f7]">
+              {/* Header: iOS Nav Bar en mobile vs macOS Tabs & Omnibox en Desktop */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-b border-black/10 flex flex-col px-3 pt-2 pb-2 shrink-0 select-none z-20 gap-2 bg-[#f6f6f6]/95 text-black">
+                  <div className="h-[36px] flex items-center justify-between">
+                    <button
+                      onClick={(e) => closeApp("chrome", e)}
+                      className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
+                    >
+                      <span className="text-xl leading-none">‹</span>
+                      <span>Inicio</span>
+                    </button>
+                    <span className="text-[14px] font-semibold text-black truncate max-w-[50%]">
+                      {chromeUrl === "chrome://newtab" ? "Nueva Pestaña" : (chromeUrl.replace("https://", "").replace("http://", "").split("/")[0])}
+                    </span>
+                    <button
+                      onClick={(e) => closeApp("chrome", e)}
+                      className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
+                    >
+                      Listo
+                    </button>
+                  </div>
 
-                {/* Tabs de Chrome (Estilo de la imagen con divisor y pill activo) */}
-                <div className="flex items-center gap-0 ml-2 flex-1 overflow-x-auto no-scrollbar pb-1">
+                  {/* iOS Omnibox */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const frameUrl = getChromeIframeUrl(chromeInputUrl);
+                      setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: frameUrl, title: frameUrl === "chrome://newtab" ? "Nueva pestaña" : frameUrl } : t));
+                      setChromeInputUrl(frameUrl);
+                    }}
+                    className="relative w-full"
+                  >
+                    <div className="h-[34px] bg-black/5 border border-black/10 rounded-xl px-3 flex items-center gap-2">
+                      <span className="text-gray-400 text-xs">🔒</span>
+                      <input
+                        type="text"
+                        value={chromeInputUrl}
+                        onChange={(e) => setChromeInputUrl(e.target.value)}
+                        placeholder="Buscar o escribir URL"
+                        className="bg-transparent border-none outline-none text-black text-[13px] w-full font-sans"
+                        spellCheck={false}
+                      />
+                      {chromeInputUrl && chromeInputUrl !== "chrome://newtab" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: "chrome://newtab", title: "Nueva pestaña" } : t));
+                            setChromeInputUrl("chrome://newtab");
+                          }}
+                          className="text-gray-400 hover:text-black text-xs font-bold"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </form>
+
+                  {/* Tira Horizontal de Pestañas Móviles (Mobile Tabs Bar) */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5 pb-0.5">
+                    {chromeTabs.map((tab) => {
+                      const isActive = tab.id === activeTabId;
+                      return (
+                        <div
+                          key={tab.id}
+                          onClick={() => {
+                            setActiveTabId(tab.id);
+                            setChromeInputUrl(tab.url);
+                            setIsMobileTabSwitcherOpen(false);
+                          }}
+                          className={`h-[28px] pl-2.5 pr-2 rounded-lg flex items-center gap-1.5 text-xs font-medium transition-all shrink-0 cursor-pointer shadow-sm ${
+                            isActive
+                              ? "bg-white text-[#007AFF] border border-[#007AFF]/30 font-semibold ring-1 ring-[#007AFF]/20"
+                              : "bg-black/5 text-black/70 hover:bg-black/10 border border-black/5"
+                          }`}
+                        >
+                          <span className="truncate max-w-[100px]">{tab.title || "Pestaña"}</span>
+                          {chromeTabs.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newTabs = chromeTabs.filter(t => t.id !== tab.id);
+                                setChromeTabs(newTabs);
+                                if (activeTabId === tab.id) {
+                                  const nextTab = newTabs[newTabs.length - 1];
+                                  setActiveTabId(nextTab.id);
+                                  setChromeInputUrl(nextTab.url);
+                                }
+                              }}
+                              className="w-4 h-4 rounded-full hover:bg-black/10 flex items-center justify-center text-[10px] text-gray-500 hover:text-black transition ml-0.5"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Botón '+' para agregar pestaña en móvil */}
+                    {chromeTabs.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTabId = `tab-${Date.now()}`;
+                          const newTab = { id: newTabId, title: "Nueva pestaña", url: "chrome://newtab", iconType: "chrome" };
+                          setChromeTabs(prev => [...prev, newTab]);
+                          setActiveTabId(newTabId);
+                          setChromeInputUrl("chrome://newtab");
+                          setIsMobileTabSwitcherOpen(false);
+                        }}
+                        className="w-7 h-[28px] rounded-lg bg-black/5 hover:bg-black/10 border border-black/5 text-gray-600 font-bold flex items-center justify-center text-sm shrink-0 transition"
+                        title="Nueva Pestaña"
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Header de Chrome: Tabs */}
+                  <div className="window-header h-[42px] bg-gradient-to-b from-[#c5d8e7] to-[#abbfcb] border-b border-[#8da4b4] flex items-end justify-between px-3 cursor-grab active:cursor-grabbing select-none relative shrink-0">
+                    {/* Botones de control estilo macOS */}
+                    <div className="flex gap-2 items-center window-control-buttons mb-2.5">
+                      <div onClick={(e) => closeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[9px] text-[#5e0000] font-black leading-none">✕</div>
+                      <div onClick={(e) => minimizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] border border-[#E0A82E] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#5c3e00] font-black leading-none">–</div>
+                      <div onClick={(e) => toggleMaximizeApp("chrome", e)} className="w-3.5 h-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 cursor-pointer flex items-center justify-center text-[10px] text-[#05400d] font-black leading-none">+</div>
+                    </div>
+
+                    {/* Tabs de Chrome */}
+                    <div className="flex items-center gap-0 ml-2 flex-1 overflow-x-auto no-scrollbar pb-1">
                   {/* Chevron tab dropdown */}
                   <button className="window-no-drag w-6 h-6 hover:bg-black/10 text-gray-700 rounded flex items-center justify-center mr-1 cursor-pointer">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
@@ -2979,25 +3423,27 @@ y las experiencias interactivas.`);
                 {/* Doble Flecha Derecha */}
                 <span className="text-gray-500 hover:text-black cursor-pointer text-xs ml-auto font-bold font-sans">»</span>
               </div>
+            </>
+          )}
 
               {/* Viewport de Chrome */}
               <div className="flex-1 bg-white overflow-hidden text-black select-text relative">
                 {chromeUrl === "chrome://newtab" ? (
-                  <div className="w-full h-full bg-white text-[#222222] flex flex-col items-center justify-center font-sans p-6 select-none">
+                  <div className="w-full h-full bg-white text-[#222222] flex flex-col items-center justify-center font-sans p-3 sm:p-6 overflow-y-auto select-none">
 
                     {/* Classic Google Logo */}
-                    <img src="/os/LogosGoogle.svg" className="w-[260px] h-auto object-contain mb-6 select-none pointer-events-none" alt="Google" />
+                    <img src="/os/LogosGoogle.svg" className="w-[180px] sm:w-[260px] h-auto object-contain mb-4 sm:mb-6 select-none pointer-events-none" alt="Google" />
 
                     {/* Search Bar Mock matching design */}
-                    <div className="w-full max-w-[560px] h-[48px] bg-white rounded-full border border-gray-200/90 shadow-sm flex items-center justify-between px-5 hover:shadow-md focus-within:shadow-md transition-all mb-8">
-                      <div className="flex items-center gap-3.5 flex-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-[18px] h-[18px] text-gray-500 cursor-pointer hover:text-black">
+                    <div className="w-full max-w-[95%] sm:max-w-[560px] h-[42px] sm:h-[48px] bg-white rounded-full border border-gray-200/90 shadow-sm flex items-center justify-between px-4 sm:px-5 hover:shadow-md focus-within:shadow-md transition-all mb-6 sm:mb-8">
+                      <div className="flex items-center gap-2 sm:gap-3.5 flex-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-gray-500 cursor-pointer hover:text-black shrink-0">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         <input
                           type="text"
                           placeholder="Preguntar a Google"
-                          className="bg-transparent border-none outline-none text-[#222222] text-[14.5px] flex-1 leading-none font-sans"
+                          className="bg-transparent border-none outline-none text-[#222222] text-[13px] sm:text-[14.5px] flex-1 leading-none font-sans"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const inputVal = (e.target as HTMLInputElement).value;
@@ -3008,11 +3454,11 @@ y las experiencias interactivas.`);
                           }}
                         />
                       </div>
-                      <div className="flex items-center gap-3.5 text-gray-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[17px] h-[17px] text-gray-500 cursor-pointer hover:text-black">
+                      <div className="flex items-center gap-2 sm:gap-3.5 text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 sm:w-[17px] sm:h-[17px] text-gray-500 cursor-pointer hover:text-black">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
                         </svg>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-[17px] h-[17px] text-gray-500 cursor-pointer hover:text-black">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 sm:w-[17px] sm:h-[17px] text-gray-500 cursor-pointer hover:text-black">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
                         </svg>
@@ -3021,7 +3467,7 @@ y las experiencias interactivas.`);
 
                     {/* Grid de Accesos Directos (Pill Style con logos del portafolio) */}
                     <div className="flex flex-col items-center gap-4 w-full max-w-[580px]">
-                      <div className="flex flex-wrap justify-center gap-6 w-full">
+                      <div className="flex flex-wrap justify-center gap-3 sm:gap-6 w-full">
 
                         {/* Portafolio Premium */}
                         <div
@@ -3030,10 +3476,10 @@ y las experiencias interactivas.`);
                             setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: target, title: "Premium" } : t));
                             setChromeInputUrl(target);
                           }}
-                          className="flex flex-col items-center gap-2 group cursor-pointer transition w-[64px]"
+                          className="flex flex-col items-center gap-1.5 sm:gap-2 group cursor-pointer transition w-[58px] sm:w-[64px]"
                         >
-                          <div className="w-[44px] h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
-                            <img src="/os/premium.svg" className="w-6 h-6 object-contain" alt="" />
+                          <div className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
+                            <img src="/os/premium.svg" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" alt="" />
                           </div>
                           <span className="text-[10px] text-gray-700 font-sans group-hover:text-black leading-tight text-center truncate w-full">Premium</span>
                         </div>
@@ -3045,10 +3491,10 @@ y las experiencias interactivas.`);
                             setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: target, title: "Tecnológico" } : t));
                             setChromeInputUrl(target);
                           }}
-                          className="flex flex-col items-center gap-2 group cursor-pointer transition w-[64px]"
+                          className="flex flex-col items-center gap-1.5 sm:gap-2 group cursor-pointer transition w-[58px] sm:w-[64px]"
                         >
-                          <div className="w-[44px] h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
-                            <img src="/os/logo-desktop.svg" className="w-6 h-6 object-contain" alt="" />
+                          <div className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] rounded-full bg-[#f1f3f4] hover:bg-[#e8eaed] flex items-center justify-center shadow-sm transition-all">
+                            <img src="/os/logo-desktop.svg" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" alt="" />
                           </div>
                           <span className="text-[10px] text-gray-700 font-sans group-hover:text-black leading-tight text-center truncate w-full">Tecnológico</span>
                         </div>
@@ -3060,10 +3506,10 @@ y las experiencias interactivas.`);
                             setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: target, title: "Currículum" } : t));
                             setChromeInputUrl(target);
                           }}
-                          className="flex flex-col items-center gap-2 group cursor-pointer transition w-[64px]"
+                          className="flex flex-col items-center gap-1.5 sm:gap-2 group cursor-pointer transition w-[58px] sm:w-[64px]"
                         >
-                          <div className="w-[44px] h-[44px] rounded-full bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center shadow-sm transition-all">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-red-500">
+                          <div className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] rounded-full bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center shadow-sm transition-all">
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 fill-red-500">
                               <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
                             </svg>
                           </div>
@@ -3082,20 +3528,185 @@ y las experiencias interactivas.`);
                     title="Chrome Frame"
                   />
                 ) : null}
+
+                {/* Modal / Selector de Pestañas Móvil (iOS Tab Switcher Grid) */}
+                {isMobile && isMobileTabSwitcherOpen && (
+                  <div className="absolute inset-0 bg-[#1c1c1e]/95 backdrop-blur-2xl z-50 flex flex-col p-4 text-white font-sans animate-in fade-in zoom-in-95 duration-200">
+                    <div className="h-[44px] flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                      <span className="text-base font-bold text-white">
+                        Pestañas ({chromeTabs.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileTabSwitcherOpen(false)}
+                        className="text-[#007AFF] text-sm font-semibold hover:opacity-80 active:opacity-60 cursor-pointer"
+                      >
+                        Listo
+                      </button>
+                    </div>
+
+                    {/* Grid de Pestañas */}
+                    <div className="flex-1 grid grid-cols-2 gap-3 overflow-y-auto pb-4">
+                      {chromeTabs.map((tab) => {
+                        const isActive = tab.id === activeTabId;
+                        return (
+                          <div
+                            key={tab.id}
+                            onClick={() => {
+                              setActiveTabId(tab.id);
+                              setChromeInputUrl(tab.url);
+                              setIsMobileTabSwitcherOpen(false);
+                            }}
+                            className={`rounded-2xl p-3 flex flex-col justify-between border transition cursor-pointer relative shadow-lg ${
+                              isActive
+                                ? "bg-white/15 border-[#007AFF] ring-2 ring-[#007AFF]/50"
+                                : "bg-white/5 border-white/10 hover:bg-white/10"
+                            }`}
+                            style={{ minHeight: "140px" }}
+                          >
+                            <div className="flex items-start justify-between gap-1 mb-2">
+                              <span className="text-xs font-semibold text-white/90 line-clamp-2 leading-tight">
+                                {tab.title || "Nueva pestaña"}
+                              </span>
+                              {chromeTabs.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newTabs = chromeTabs.filter(t => t.id !== tab.id);
+                                    setChromeTabs(newTabs);
+                                    if (activeTabId === tab.id) {
+                                      const nextTab = newTabs[newTabs.length - 1];
+                                      setActiveTabId(nextTab.id);
+                                      setChromeInputUrl(nextTab.url);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded-full bg-black/40 hover:bg-black/70 flex items-center justify-center text-[10px] text-white/80 hover:text-white shrink-0 ml-1"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex-1 bg-black/30 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+                              <span className="text-[10px] text-white/50 truncate w-full">
+                                {tab.url === "chrome://newtab" ? "Google" : tab.url.replace("https://", "").replace("http://", "").split("/")[0]}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer de Pestañas */}
+                    <div className="h-[48px] border-t border-white/10 pt-2 flex items-center justify-between shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTabId = `tab-${Date.now()}`;
+                          const newTab = { id: newTabId, title: "Nueva pestaña", url: "chrome://newtab", iconType: "chrome" };
+                          setChromeTabs(prev => [...prev, newTab]);
+                          setActiveTabId(newTabId);
+                          setChromeInputUrl("chrome://newtab");
+                          setIsMobileTabSwitcherOpen(false);
+                        }}
+                        className="text-[#007AFF] text-sm font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span className="text-lg">+</span>
+                        <span>Nueva Pestaña</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileTabSwitcherOpen(false)}
+                        className="text-white/60 hover:text-white text-sm cursor-pointer"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* iOS Bottom Toolbar & Home Indicator en Mobile */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-t border-black/10 flex flex-col shrink-0 select-none z-20 bg-[#f6f6f6]/95 text-black">
+                  <div className="h-[44px] flex items-center justify-around px-4 text-[#007AFF]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Go home / newtab
+                        setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: "chrome://newtab", title: "Nueva pestaña" } : t));
+                        setChromeInputUrl("chrome://newtab");
+                        setIsMobileTabSwitcherOpen(false);
+                      }}
+                      className="p-2 active:opacity-60 transition text-lg cursor-pointer"
+                      title="Inicio"
+                    >
+                      <HomeIcon className="w-5 h-5 stroke-[2]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const temp = chromeUrl;
+                        setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: "" } : t));
+                        setTimeout(() => {
+                          setChromeTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, url: temp } : t));
+                        }, 50);
+                      }}
+                      className="p-2 active:opacity-60 transition cursor-pointer"
+                      title="Recargar"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTabId = `tab-${Date.now()}`;
+                        setChromeTabs(prev => [...prev.slice(0, 4), { id: newTabId, title: "Nueva pestaña", url: "chrome://newtab", iconType: "chrome" }]);
+                        setActiveTabId(newTabId);
+                        setChromeInputUrl("chrome://newtab");
+                        setIsMobileTabSwitcherOpen(false);
+                      }}
+                      className="p-2 active:opacity-60 transition text-lg font-bold cursor-pointer"
+                      title="Nueva Pestaña"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileTabSwitcherOpen(prev => !prev)}
+                      className={`w-6 h-6 rounded-md border text-[11px] font-bold flex items-center justify-center cursor-pointer active:scale-95 transition ${
+                        isMobileTabSwitcherOpen ? "bg-[#007AFF] text-white border-[#007AFF]" : "border-[#007AFF] text-[#007AFF]"
+                      }`}
+                      title="Ver Pestañas"
+                    >
+                      {chromeTabs.length}
+                    </button>
+                  </div>
+                  {/* Home Indicator */}
+                  <div
+                    onClick={(e) => closeApp("chrome", e)}
+                    className="h-[20px] flex items-center justify-center cursor-pointer active:opacity-60 transition"
+                  >
+                    <div className="w-32 h-1 bg-black/30 rounded-full" />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Rnd>
         )}
 
-        {/* ==================== APLICACIÓN: CALENDARIO DE APPLE (Diseño Nativo macOS Tahoe) ==================== */}
+        {/* ==================== APLICACIÓN: CALENDARIO DE APPLE (Diseño Nativo macOS Tahoe / iOS Calendar) ==================== */}
         {openWindows.calendar && openWindows.calendar.isOpen && !openWindows.calendar.isMinimized && (
           <Rnd
-            size={openWindows.calendar.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.calendar.size.width, height: openWindows.calendar.size.height }}
-            position={openWindows.calendar.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.calendar.position.x, y: openWindows.calendar.position.y }}
+            size={isMobile ? { width: "100%", height: "100%" } : openWindows.calendar.isMaximized ? { width: "100%", height: "100%" } : { width: openWindows.calendar.size.width, height: openWindows.calendar.size.height }}
+            position={isMobile ? { x: 0, y: 0 } : openWindows.calendar.isMaximized ? { x: 0, y: 0 } : isDraggingActive ? undefined : { x: openWindows.calendar.position.x, y: openWindows.calendar.position.y }}
             onDragStart={() => setIsDraggingActive(true)}
             onDragStop={(e, d) => {
               setIsDraggingActive(false);
-              if (openWindows.calendar.isMaximized) return;
+              if (openWindows.calendar.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 calendar: {
@@ -3105,7 +3716,7 @@ y las experiencias interactivas.`);
               }));
             }}
             onResizeStop={(e, direction, ref, delta, position) => {
-              if (openWindows.calendar.isMaximized) return;
+              if (openWindows.calendar.isMaximized || isMobile) return;
               setOpenWindows(prev => ({
                 ...prev,
                 calendar: {
@@ -3115,10 +3726,10 @@ y las experiencias interactivas.`);
                 }
               }));
             }}
-            minWidth={720}
-            minHeight={480}
-            cancel=".window-control-buttons, input, button, select, .no-drag"
-            enableResizing={{
+            minWidth={isMobile ? 0 : 500}
+            minHeight={isMobile ? 0 : 350}
+            cancel=".window-control-buttons, input, button, select, .no-drag, .ios-action-btn"
+            enableResizing={isMobile || openWindows.calendar.isMaximized ? false : {
               top: !openWindows.calendar.isMaximized,
               right: !openWindows.calendar.isMaximized,
               bottom: !openWindows.calendar.isMaximized,
@@ -3128,7 +3739,7 @@ y las experiencias interactivas.`);
               bottomLeft: !openWindows.calendar.isMaximized,
               topLeft: !openWindows.calendar.isMaximized,
             }}
-            disableDragging={openWindows.calendar.isMaximized}
+            disableDragging={isMobile || openWindows.calendar.isMaximized}
             style={{
               zIndex: openWindows.calendar.zIndex,
               display: openWindows.calendar.isOpen && !openWindows.calendar.isMinimized ? "block" : "none"
@@ -3137,92 +3748,126 @@ y las experiencias interactivas.`);
           >
             <div
               onClick={() => focusWindow("calendar")}
-              className="w-full h-full bg-[#1e222d]/95 backdrop-blur-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col pointer-events-auto select-none border border-white/10 text-white font-sans"
+              className={`w-full h-full bg-[#1e222d] ${isMobile ? "ios-app-animate inset-0 rounded-none border-none shadow-none" : "rounded-2xl border border-white/10 shadow-2xl"} overflow-hidden flex flex-col pointer-events-auto select-none text-white font-sans`}
             >
-              {/* Header / Barra de Título Apple Calendar Exacta a la Captura */}
-              <div className="h-[52px] bg-[#1a1d26]/90 border-b border-white/5 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
-                {/* Lado Izquierdo: Botones Semáforo + Botones de Vista/Acciones Apple */}
-                <div className="flex items-center gap-4">
-                  {/* Semáforo macOS */}
-                  <div className="flex gap-2 items-center window-control-buttons">
-                    <div
+              {/* Header: iOS Nav Bar en mobile vs macOS Header en Desktop */}
+              {isMobile ? (
+                <div className="ios-nav-blur border-b border-white/10 flex flex-col px-3.5 pt-2 pb-2 shrink-0 select-none z-20 gap-2">
+                  <div className="h-[38px] flex items-center justify-between">
+                    <button
                       onClick={(e) => closeApp("calendar", e)}
-                      className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:bg-[#ff493d] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
+                      className="ios-action-btn flex items-center gap-1 text-[#007AFF] active:opacity-60 text-[15px] font-medium transition cursor-pointer"
                     >
-                      ×
-                    </div>
-                    <div
-                      onClick={(e) => minimizeApp("calendar", e)}
-                      className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:bg-[#e6a81e] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
-                    >
-                      –
-                    </div>
-                    <div
-                      onClick={(e) => toggleMaximizeApp("calendar", e)}
-                      className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:bg-[#1fd339] cursor-pointer flex items-center justify-center text-[7px] text-black font-bold shadow-sm"
-                    >
-                      +
-                    </div>
-                  </div>
-
-                  {/* Iconos de Barra de Herramientas Apple Calendar */}
-                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 no-drag">
-                    <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
-                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z"/></svg>
+                      <span className="text-xl leading-none">‹</span>
+                      <span>Inicio</span>
                     </button>
-                    <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
-                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    <span className="text-[15px] font-semibold text-white truncate max-w-[55%]">
+                      {calendarViewMode === "year" ? `Año ${calendarYear}` : calendarViewMode === "month" ? `${["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"][calendarMonth]} ${calendarYear}` : "Cronología"}
+                    </span>
+                    <button
+                      onClick={(e) => closeApp("calendar", e)}
+                      className="ios-action-btn text-[#007AFF] active:opacity-60 text-[15px] font-semibold transition cursor-pointer"
+                    >
+                      Listo
                     </button>
                   </div>
 
-                  {/* Botones de acción rápida: + y Alerta */}
-                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 no-drag">
-                    <button className="px-2 py-1 hover:bg-white/10 rounded text-xs font-bold text-white/70 hover:text-white transition">
-                      +
-                    </button>
-                    <button className="px-2 py-1 hover:bg-white/10 rounded text-xs text-white/70 hover:text-white transition">
-                      ⚠️
-                    </button>
-                  </div>
-                </div>
-
-                {/* Lado Derecho: Switcher (Día, Semana, Mes, Año) + Búsqueda */}
-                <div className="flex items-center gap-3 no-drag">
-                  {/* Selector de Vistas estilo Apple (Día / Semana / Mes / Año / Cronología) */}
-                  <div className="flex bg-black/40 border border-white/10 rounded-lg p-1 text-[12px] font-medium text-white/75">
+                  {/* iOS View Mode Segmented Control */}
+                  <div className="flex bg-white/10 rounded-xl p-1 text-xs font-semibold text-white/70">
                     <button
                       onClick={() => setCalendarViewMode("year")}
-                      className={`px-3 py-0.5 rounded-md transition ${calendarViewMode === "year" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      className={`flex-1 py-1 rounded-lg transition text-center ${calendarViewMode === "year" ? "bg-white text-black shadow font-bold" : "hover:text-white"}`}
                     >
                       Año
                     </button>
                     <button
                       onClick={() => setCalendarViewMode("month")}
-                      className={`px-3 py-0.5 rounded-md transition ${calendarViewMode === "month" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      className={`flex-1 py-1 rounded-lg transition text-center ${calendarViewMode === "month" ? "bg-white text-black shadow font-bold" : "hover:text-white"}`}
                     >
                       Mes
                     </button>
                     <button
                       onClick={() => setCalendarViewMode("timeline")}
-                      className={`px-3 py-0.5 rounded-md transition flex items-center gap-1.5 ${calendarViewMode === "timeline" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      className={`flex-1 py-1 rounded-lg transition text-center ${calendarViewMode === "timeline" ? "bg-white text-black shadow font-bold" : "hover:text-white"}`}
                     >
-                      <span>📜</span>
-                      <span>Cronología</span>
+                      Cronología
                     </button>
                   </div>
+                </div>
+              ) : (
+                <div className="h-[52px] bg-[#1a1d26]/90 border-b border-white/5 flex items-center justify-between px-3 sm:px-4 cursor-grab active:cursor-grabbing select-none shrink-0">
+                  {/* Lado Izquierdo: Botones Semáforo + Botones de Vista/Acciones Apple */}
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Semáforo macOS */}
+                    <div className="flex gap-2 items-center window-control-buttons">
+                      <div
+                        onClick={(e) => closeApp("calendar", e)}
+                        className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:bg-[#ff493d] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
+                      >
+                        ×
+                      </div>
+                      <div
+                        onClick={(e) => minimizeApp("calendar", e)}
+                        className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:bg-[#e6a81e] cursor-pointer flex items-center justify-center text-[8px] text-black font-bold shadow-sm"
+                      >
+                        –
+                      </div>
+                      <div
+                        onClick={(e) => toggleMaximizeApp("calendar", e)}
+                        className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:bg-[#1fd339] cursor-pointer flex items-center justify-center text-[7px] text-black font-bold shadow-sm"
+                      >
+                        +
+                      </div>
+                    </div>
+
+                    {/* Iconos de Barra de Herramientas Apple Calendar */}
+                    <div className="hidden sm:flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 no-drag">
+                      <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z"/></svg>
+                      </button>
+                      <button className="p-1.5 hover:bg-white/10 rounded text-white/70 hover:text-white transition">
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lado Derecho: Switcher (Año, Mes, Cronología) + Búsqueda */}
+                  <div className="flex items-center gap-2 sm:gap-3 no-drag">
+                    {/* Selector de Vistas estilo Apple (Año / Mes / Cronología) */}
+                    <div className="flex bg-black/40 border border-white/10 rounded-lg p-0.5 sm:p-1 text-[11px] sm:text-[12px] font-medium text-white/75">
+                      <button
+                        onClick={() => setCalendarViewMode("year")}
+                        className={`px-2 sm:px-3 py-0.5 rounded-md transition ${calendarViewMode === "year" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      >
+                        Año
+                      </button>
+                      <button
+                        onClick={() => setCalendarViewMode("month")}
+                        className={`px-2 sm:px-3 py-0.5 rounded-md transition ${calendarViewMode === "month" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      >
+                        Mes
+                      </button>
+                      <button
+                        onClick={() => setCalendarViewMode("timeline")}
+                        className={`px-2 sm:px-3 py-0.5 rounded-md transition flex items-center gap-1 ${calendarViewMode === "timeline" ? "bg-white/20 text-white font-semibold shadow-sm" : "hover:text-white"}`}
+                      >
+                        <span>📜</span>
+                        <span className="hidden sm:inline">Cronología</span>
+                      </button>
+                    </div>
 
                   {/* Botón y Barra de Búsqueda Interactiva Apple */}
                   <div className="relative flex items-center">
                     {isCalendarSearchOpen ? (
-                      <div className="flex items-center gap-2 bg-black/50 border border-white/20 rounded-full px-3 py-1 text-xs text-white backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-center gap-1.5 bg-black/50 border border-white/20 rounded-full px-2.5 py-1 text-xs text-white backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-150">
                         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-current stroke-2 text-white/50"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                         <input
                           type="text"
                           value={calendarSearch}
                           onChange={(e) => setCalendarSearch(e.target.value)}
-                          placeholder="Buscar eventos, tecnologías..."
+                          placeholder="Buscar..."
                           autoFocus
-                          className="bg-transparent border-none outline-none text-xs text-white placeholder-white/40 w-44 font-sans"
+                          className="bg-transparent border-none outline-none text-xs text-white placeholder-white/40 w-24 sm:w-44 font-sans"
                         />
                         {calendarSearch && (
                           <button
@@ -3237,33 +3882,34 @@ y las experiencias interactivas.`);
                             setIsCalendarSearchOpen(false);
                             setCalendarSearch("");
                           }}
-                          className="text-[11px] text-white/60 hover:text-white pl-1 border-l border-white/10"
+                          className="text-[10.5px] text-white/60 hover:text-white pl-1 border-l border-white/10"
                         >
-                          Cerrar
+                          ✕
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => setIsCalendarSearchOpen(true)}
-                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition shadow-sm"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition shadow-sm"
                         title="Buscar en Calendario"
                       >
-                        <svg viewBox="0 0 24 24" className="w-4 h-4 fill-none stroke-current stroke-2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-none stroke-current stroke-2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                       </button>
                     )}
                   </div>
                 </div>
               </div>
+            )}
 
               {/* Sub-cabecera con Año Dinámico, Selector Rápido de Años y Botón "Hoy" */}
-              <div className="px-8 pt-5 pb-3 flex justify-between items-center no-drag border-b border-white/5">
-                <div className="flex items-center gap-4">
-                  <h1 className="text-4xl font-extrabold tracking-tight text-white/95 font-sans">
+              <div className="px-3 sm:px-8 pt-3 sm:pt-5 pb-3 flex justify-between items-center no-drag border-b border-white/5 flex-wrap gap-2">
+                <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar max-w-full">
+                  <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white/95 font-sans shrink-0">
                     {calendarYear}
                   </h1>
 
                   {/* Selector Rápido de Años para navegar trayectoria */}
-                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5">
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5 shrink-0">
                     {[2022, 2023, 2024, 2025, 2026].map(y => (
                       <button
                         key={y}
@@ -3273,7 +3919,7 @@ y las experiencias interactivas.`);
                             setCalendarViewMode("year");
                           }
                         }}
-                        className={`px-2 py-1 rounded text-xs font-semibold transition ${calendarYear === y ? "bg-[#007AFF] text-white shadow-sm" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+                        className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs font-semibold transition ${calendarYear === y ? "bg-[#007AFF] text-white shadow-sm" : "text-white/60 hover:text-white hover:bg-white/10"}`}
                       >
                         {y}
                       </button>
@@ -3281,23 +3927,23 @@ y las experiencias interactivas.`);
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
                   <button
                     onClick={() => setCalendarYear(prev => Math.max(2020, prev - 1))}
-                    className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
                     title="Año anterior"
                   >
                     ‹
                   </button>
                   <button
                     onClick={() => { setCalendarYear(2026); setCalendarMonth(7); setCalendarViewMode("year"); }}
-                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-white/90 transition shadow-sm"
+                    className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/15 text-[11px] sm:text-xs font-semibold text-white/90 transition shadow-sm"
                   >
                     Hoy
                   </button>
                   <button
                     onClick={() => setCalendarYear(prev => Math.min(2030, prev + 1))}
-                    className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white text-xs transition"
                     title="Año siguiente"
                   >
                     ›
@@ -3306,7 +3952,7 @@ y las experiencias interactivas.`);
               </div>
 
               {/* Contenedor Principal: Vistas de Calendario */}
-              <div className="flex-1 overflow-y-auto px-8 py-5 no-drag">
+              <div className="flex-1 overflow-y-auto px-3 sm:px-8 py-3 sm:py-5 no-drag">
                 {/* Panel de Resultados de Búsqueda Activa */}
                 {calendarSearch.trim() ? (
                   <div className="max-w-4xl mx-auto flex flex-col gap-4 pb-6">
@@ -3509,7 +4155,7 @@ y las experiencias interactivas.`);
                   </div>
                 ) : calendarViewMode === "year" ? (
                   /* ==================== VISTA AÑO: GRID DE 12 MESES (EXACTO A APPLE) ==================== */
-                  <div className="grid grid-cols-4 gap-x-8 gap-y-6 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-x-8 sm:gap-y-6 pt-1">
                     {[
                       { name: "Enero", index: 0, days: 31, offset: 3, prevDays: [29, 30, 31] },
                       { name: "Febrero", index: 1, days: (calendarYear % 4 === 0 ? 29 : 28), offset: 6, prevDays: [26, 27, 28, 29, 30, 31] },
@@ -3607,24 +4253,21 @@ y las experiencias interactivas.`);
                       >
                         ‹ Volver al Año {calendarYear}
                       </button>
-                      <div className="flex gap-2 text-xs">
+                      <div className="flex gap-2 text-[11px] sm:text-xs">
                         <span className="flex items-center gap-1.5 text-white/70">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#007AFF]" /> Experiencia Laboral
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#007AFF]" /> Experiencia
                         </span>
                         <span className="flex items-center gap-1.5 text-white/70">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" /> Estudios & Formación
-                        </span>
-                        <span className="flex items-center gap-1.5 text-white/70">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#34C759]" /> Hito
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" /> Estudios
                         </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-7 text-xs font-bold text-white/40 text-center pb-2 border-b border-white/10">
-                      <span>LUNES</span><span>MARTES</span><span>MIÉRCOLES</span><span>JUEVES</span><span>VIERNES</span><span>SÁBADO</span><span>DOMINGO</span>
+                    <div className="grid grid-cols-7 text-[10px] sm:text-xs font-bold text-white/40 text-center pb-2 border-b border-white/10">
+                      <span>LUN</span><span>MAR</span><span>MIÉ</span><span>JUE</span><span>VIE</span><span>SÁB</span><span>DOM</span>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-1 sm:gap-2">
                       {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
                         const event = calendarEvents.find(ev => ev.year === calendarYear && ev.month === calendarMonth && ev.day === day);
                         const isToday = calendarYear === 2026 && calendarMonth === 7 && day === 20;
@@ -3633,7 +4276,7 @@ y las experiencias interactivas.`);
                           <div
                             key={day}
                             onClick={() => event && setSelectedCalendarEvent(event)}
-                            className={`min-h-[85px] p-2 rounded-xl border flex flex-col justify-between transition cursor-pointer ${
+                            className={`min-h-[50px] sm:min-h-[85px] p-1 sm:p-2 rounded-xl border flex flex-col justify-between transition cursor-pointer ${
                               isToday
                                 ? "bg-white/10 border-white/30"
                                 : event
@@ -3642,19 +4285,19 @@ y las experiencias interactivas.`);
                             }`}
                           >
                             <div className="flex justify-between items-center">
-                              <span className={`text-xs font-semibold ${isToday ? "w-6 h-6 rounded-full bg-[#FF3B30] text-white flex items-center justify-center font-bold" : "text-white/80"}`}>
+                              <span className={`text-[11px] sm:text-xs font-semibold ${isToday ? "w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#FF3B30] text-white flex items-center justify-center font-bold" : "text-white/80"}`}>
                                 {day}
                               </span>
                               {event && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded-full uppercase font-bold text-white shadow-sm" style={{ backgroundColor: event.color }}>
-                                  {event.category}
+                                <span className="text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.2 rounded-full uppercase font-bold text-white shadow-sm" style={{ backgroundColor: event.color }}>
+                                  {event.category === "experience" ? "Exp" : "Est"}
                                 </span>
                               )}
                             </div>
                             {event && (
-                              <div className="mt-1 p-1.5 rounded-lg bg-black/30 border border-white/5">
-                                <div className="text-[10.5px] font-bold text-white truncate">{event.title}</div>
-                                <div className="text-[9px] text-white/60 truncate">{event.institution}</div>
+                              <div className="mt-0.5 sm:mt-1 p-1 sm:p-1.5 rounded bg-black/30 border border-white/5">
+                                <div className="text-[9.5px] sm:text-[10.5px] font-bold text-white truncate">{event.title}</div>
+                                <div className="hidden sm:block text-[9px] text-white/60 truncate">{event.institution}</div>
                               </div>
                             )}
                           </div>
@@ -3667,10 +4310,10 @@ y las experiencias interactivas.`);
 
               {/* Modal / Inspector Flotante al seleccionar un Evento de Experiencia o Estudios */}
               {selectedCalendarEvent && (
-                <div className="border-t border-white/10 bg-[#161820]/95 p-4 px-8 flex items-center justify-between gap-6 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-                  <div className="flex items-start gap-4 flex-1">
+                <div className="border-t border-white/10 bg-[#161820]/95 p-3 px-3 sm:px-8 flex items-start sm:items-center justify-between gap-3 sm:gap-6 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0">
+                  <div className="flex items-start gap-2.5 sm:gap-4 flex-1 min-w-0">
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-lg text-white shadow-md shrink-0 mt-0.5 overflow-hidden border border-white/15 bg-white/10"
+                      className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-base sm:text-lg text-white shadow-md shrink-0 mt-0.5 overflow-hidden border border-white/15 bg-white/10"
                       style={!selectedCalendarEvent.logo ? { backgroundColor: selectedCalendarEvent.color } : {}}
                     >
                       {selectedCalendarEvent.logo ? (
@@ -3679,22 +4322,22 @@ y las experiencias interactivas.`);
                         selectedCalendarEvent.category === "experience" ? "💼" : selectedCalendarEvent.category === "education" ? "🎓" : "🚀"
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-sm font-bold text-white">{selectedCalendarEvent.title}</h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/70 font-mono">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xs sm:text-sm font-bold text-white truncate">{selectedCalendarEvent.title}</h3>
+                        <span className="text-[9.5px] sm:text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/70 font-mono">
                           {selectedCalendarEvent.period}
                         </span>
                       </div>
-                      <div className="text-xs text-white/80 font-medium mt-0.5">
+                      <div className="text-[11px] sm:text-xs text-white/80 font-medium mt-0.5 truncate">
                         {selectedCalendarEvent.institution} • <span className="text-white/50">{selectedCalendarEvent.location}</span>
                       </div>
-                      <p className="text-xs text-white/65 mt-1 leading-relaxed max-w-4xl">
+                      <p className="text-[11px] sm:text-xs text-white/65 mt-1 leading-relaxed max-w-4xl line-clamp-2 sm:line-clamp-none">
                         {selectedCalendarEvent.description}
                       </p>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
+                      <div className="flex flex-wrap gap-1 mt-1.5">
                         {selectedCalendarEvent.skills.map((skill, sIdx) => (
-                          <span key={sIdx} className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] font-mono text-white/80">
+                          <span key={sIdx} className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] sm:text-[10px] font-mono text-white/80">
                             {skill}
                           </span>
                         ))}
@@ -3710,6 +4353,17 @@ y las experiencias interactivas.`);
                 </div>
               )}
 
+              {/* iOS Home Indicator en Mobile */}
+              {isMobile && (
+                <div
+                  onClick={(e) => closeApp("calendar", e)}
+                  className="h-[22px] bg-[#1e222d] border-t border-white/10 flex items-center justify-center cursor-pointer shrink-0 active:opacity-60 transition"
+                  title="Deslizar para ir a Inicio"
+                >
+                  <div className="w-32 h-1 bg-white/40 rounded-full" />
+                </div>
+              )}
+
             </div>
           </Rnd>
         )}
@@ -3717,7 +4371,7 @@ y las experiencias interactivas.`);
       {/* ==================== CHIPS DE VENTANAS MINIMIZADAS (libres por toda la pantalla) ==================== */}
       {(Object.keys(openWindows) as string[]).map((appId) => {
         const win = openWindows[appId];
-        if (!win.isOpen || !win.isMinimized) return null;
+        if (isMobile || !win.isOpen || !win.isMinimized) return null;
 
         const labels: Record<string, string> = {
           finder: "Mi CV",
@@ -3776,12 +4430,12 @@ y las experiencias interactivas.`);
       <div
         onMouseEnter={() => setShowDockFullscreen(true)}
         onMouseLeave={() => setShowDockFullscreen(false)}
-        className={`absolute bottom-[20px] left-[50%] -translate-x-1/2 z-[9999] select-none transition-all duration-300 ease-out ${isAnyAppMaximized && !showDockFullscreen
+        className={`absolute bottom-[20px] left-[50%] -translate-x-1/2 z-[9999] select-none transition-all duration-300 ease-out ${(isMobile && isAnyAppOpen) || (isAnyAppMaximized && !showDockFullscreen)
           ? "translate-y-[150%] opacity-0 pointer-events-none"
           : "translate-y-0 opacity-100"
           }`}
       >
-        <div className="index-dock-container px-[30px] py-[12px] rounded-[28px] flex items-end gap-[22px] shadow-2xl relative">
+        <div className={`index-dock-container flex items-end shadow-2xl relative ${isMobile ? "px-[14px] py-[8px] rounded-[22px] gap-[12px]" : "px-[30px] py-[12px] rounded-[28px] gap-[22px]"}`}>
 
           {/* Finder Icon (Abre Finder) */}
           <motion.div
@@ -3790,14 +4444,14 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] flex items-center justify-center cursor-pointer shadow-lg rounded-[14px] overflow-hidden">
+            <div className={`flex items-center justify-center cursor-pointer shadow-lg rounded-[12px] sm:rounded-[14px] overflow-hidden ${isMobile ? "w-[42px] h-[42px]" : "w-[52px] h-[52px]"}`}>
               <img src="/os/image.png" className="w-full h-full object-cover" alt="Finder" />
             </div>
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Finder
             </span>
             {openWindows.finder.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -3808,8 +4462,8 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] flex items-center justify-center cursor-pointer">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-[48px] h-[48px] drop-shadow-lg">
+            <div className={`flex items-center justify-center cursor-pointer rounded-[12px] sm:rounded-[14px] overflow-hidden ${isMobile ? "w-[42px] h-[42px]" : "w-[52px] h-[52px]"}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className={`${isMobile ? "w-[36px] h-[36px]" : "w-[48px] h-[48px]"} drop-shadow-lg`}>
                 <path fill="#fa0f00" d="M90.5 0h331C471.8 0 512 40.2 512 90.5v331c0 50.3-40.2 90.5-90.5 90.5h-331C40.2 512 0 471.8 0 421.5v-331C0 40.2 40.2 0 90.5 0" />
                 <path fill="#fff" d="M408.3 295.3c-23.8-24.7-88.7-14.6-104.2-12.8c-22.9-21.9-38.4-48.5-43.9-57.6c8.2-24.7 13.7-49.4 14.6-75.9c0-22.9-9.1-47.5-34.7-47.5c-9.1 0-17.4 5.5-21.9 12.8c-11 19.2-6.4 57.6 11 96.9c-10.1 28.3-19.2 55.8-44.8 104.2c-26.5 11-82.3 36.6-86.9 64c-1.8 8.2.9 16.5 7.3 22.9c6.4 5.5 14.6 8.2 22.9 8.2c33.8 0 66.7-46.6 89.6-85.9c19.2-6.4 49.4-15.5 79.5-21c35.7 31.1 66.7 35.7 83.2 35.7c21.9 0 30.2-9.1 32.9-17.4c4.5-9.2 1.8-19.3-4.6-26.6m-22.9 15.6c-.9 6.4-9.1 12.8-23.8 9.1c-17.4-4.6-32.9-12.8-46.6-23.8c11.9-1.8 38.4-4.6 57.6-.9c7.3 1.8 14.7 6.4 12.8 15.6M232.7 122.5c1.8-2.7 4.6-4.6 7.3-4.6c8.2 0 10.1 10.1 10.1 18.3c-.9 19.2-4.6 38.4-11 56.7c-13.7-36.6-10.9-62.2-6.4-70.4m-1.8 177.4c7.3-14.6 17.4-40.2 21-51.2c8.2 13.7 21.9 30.2 29.3 37.5c0 .9-28.3 6.4-50.3 13.7M177 336.5c-21 34.7-43 56.7-54.9 56.7c-1.8 0-3.7-.9-5.5-1.8c-2.7-1.8-3.7-4.6-2.7-8.2c2.7-12.9 26.5-30.3 63.1-46.7" />
               </svg>
@@ -3818,7 +4472,7 @@ y las experiencias interactivas.`);
               Mi CV
             </span>
             {openWindows.acrobat.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -3829,8 +4483,8 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] bg-white rounded-[14px] flex items-center justify-center cursor-pointer shadow-lg border border-white/5 overflow-hidden">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" className="w-[44px] h-[44px]">
+            <div className={`bg-white rounded-[12px] sm:rounded-[14px] flex items-center justify-center cursor-pointer shadow-lg border border-white/5 overflow-hidden ${isMobile ? "w-[42px] h-[42px]" : "w-[52px] h-[52px]"}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" className={isMobile ? "w-[34px] h-[34px]" : "w-[44px] h-[44px]"}>
                 <path fill="#fff" d="M128.003 199.216c39.335 0 71.221-31.888 71.221-71.223S167.338 56.77 128.003 56.77S56.78 88.658 56.78 127.993s31.887 71.223 71.222 71.223" />
                 <path fill="#229342" d="M35.89 92.997Q27.92 79.192 17.154 64.02a127.98 127.98 0 0 0 110.857 191.981q17.671-24.785 23.996-35.74q12.148-21.042 31.423-60.251v-.015a63.993 63.993 0 0 1-110.857.017Q46.395 111.19 35.89 92.998" />
                 <path fill="#fbc116" d="M128.008 255.996A127.97 127.97 0 0 0 256 127.997A128 128 0 0 0 238.837 64q-36.372-3.585-53.686-3.585q-19.632 0-57.152 3.585l-.014.01a63.99 63.99 0 0 1 55.444 31.987a63.99 63.99 0 0 1-.001 64.01z" />
@@ -3842,7 +4496,7 @@ y las experiencias interactivas.`);
               Chrome
             </span>
             {openWindows.chrome.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -3853,13 +4507,13 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] bg-white rounded-[13px] flex flex-col items-center justify-between pt-1.5 pb-1 cursor-pointer shadow-[0_8px_16px_rgba(0,0,0,0.28)] border border-black/5 overflow-hidden font-sans select-none">
+            <div className={`bg-white flex flex-col items-center justify-between pt-1 pb-0.5 cursor-pointer border border-black/5 overflow-hidden font-sans select-none ${isMobile ? "w-[42px] h-[42px] rounded-[10px] shadow-md" : "w-[52px] h-[52px] rounded-[13px] shadow-[0_8px_16px_rgba(0,0,0,0.28)] pt-1.5 pb-1"}`}>
               {/* Día en Rojo Apple (ej. 'Jue') */}
-              <span className="text-[#FF3B30] text-[11px] font-bold tracking-tight leading-none">
+              <span className={`text-[#FF3B30] font-bold tracking-tight leading-none ${isMobile ? "text-[9px]" : "text-[11px]"}`}>
                 {dayOfWeekShort}
               </span>
               {/* Número del Día en Negro Oscuro Apple (ej. '20') */}
-              <span className="text-[27px] font-[350] text-[#1D1D1F] tracking-tight leading-none mb-0.5 font-sans">
+              <span className={`font-[350] text-[#1D1D1F] tracking-tight leading-none mb-0.5 font-sans ${isMobile ? "text-[19px]" : "text-[27px]"}`}>
                 {dayNumber}
               </span>
             </div>
@@ -3867,7 +4521,7 @@ y las experiencias interactivas.`);
               Calendario
             </span>
             {openWindows.calendar?.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -3878,14 +4532,14 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] flex items-center justify-center cursor-pointer shadow-lg rounded-[14px] overflow-hidden">
+            <div className={`flex items-center justify-center cursor-pointer shadow-lg rounded-[12px] sm:rounded-[14px] overflow-hidden ${isMobile ? "w-[42px] h-[42px]" : "w-[52px] h-[52px]"}`}>
               <img src="/os/notas-apple.png" className="w-full h-full object-cover" alt="Notas" />
             </div>
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Notas
             </span>
             {openWindows.notes.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 
@@ -3896,14 +4550,14 @@ y las experiencias interactivas.`);
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             className="flex flex-col items-center gap-0.5 relative group"
           >
-            <div className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center cursor-pointer shadow-lg overflow-hidden">
+            <div className={`rounded-[12px] sm:rounded-[14px] flex items-center justify-center cursor-pointer shadow-lg overflow-hidden ${isMobile ? "w-[42px] h-[42px]" : "w-[52px] h-[52px]"}`}>
               <img src="/os/terminal.png" className="w-full h-full object-cover" alt="Terminal" />
             </div>
             <span className="absolute bottom-[72px] left-[50%] translate-x-[-50%] opacity-0 group-hover:opacity-100 group-hover:bottom-[66px] index-dock-tooltip index-dock-tooltip-arrow shadow-md font-medium whitespace-nowrap transition-all pointer-events-none z-[99999]">
               Terminal
             </span>
             {openWindows.terminal.isOpen && (
-              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-10px] left-1/2 -translate-x-1/2" />
+              <div className="w-[4px] h-[4px] rounded-full bg-white absolute bottom-[-8px] left-1/2 -translate-x-1/2" />
             )}
           </motion.div>
 

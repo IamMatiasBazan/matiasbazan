@@ -192,3 +192,82 @@ html, body {
   display: block !important;
   width: 0 !important;
 }
+
+/* =========================================================
+   MOBILE RESPONSIVE & iOS NATIVE INTERFACE — Virtual OS
+   ========================================================= */
+
+/* Fullscreen window overlay for mobile */
+.mobile-window-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  z-index: 9999 !important;
+}
+
+/* iOS Springboard / App transition */
+@keyframes iosAppOpen {
+  from {
+    transform: scale(0.92) translateY(20px);
+    opacity: 0;
+    border-radius: 40px;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    border-radius: 0;
+  }
+}
+
+.ios-app-animate {
+  animation: iosAppOpen 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* iOS Status Bar & Nav Bar standard blur */
+.ios-nav-blur {
+  background: rgba(28, 28, 30, 0.88) !important;
+  backdrop-filter: blur(25px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+}
+
+.ios-light-blur {
+  background: rgba(246, 246, 246, 0.88) !important;
+  backdrop-filter: blur(25px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+}
+
+/* Dock mobile compact */
+@media (max-width: 768px) {
+  .index-dock-container {
+    gap: 12px !important;
+    padding: 8px 18px !important;
+    border-radius: 22px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .index-dock-container {
+    gap: 10px !important;
+    padding: 7px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  /* Hide dock tooltips on very small screens */
+  .index-dock-tooltip {
+    display: none !important;
+  }
+}
+
+/* Prevent OS horizontal overflow on mobile */
+@media (max-width: 768px) {
+  html, body {
+    overflow: hidden !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+    touch-action: pan-y !important;
+  }
+}
+
